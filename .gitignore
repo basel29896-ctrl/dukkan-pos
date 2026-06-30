@@ -1,0 +1,9 @@
+.env
+.env.local
+.env.production
+*.secret
+node_modules/
+build/
+*.asc
+*.pem
+*.key
