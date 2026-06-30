@@ -154,23 +154,70 @@ function Centered({ children }) {
   return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.dim, fontFamily: "'DM Sans', system-ui, sans-serif" }}>{children}</div>;
 }
 
+const VIEW_ICONS = { sales: '🛒', inventory: '📦', history: '🧾', reports: '📊', settings: '⚙️' };
 function Header({ user, view, setView, navViews, onLogout }) {
   return (
-    <header style={{ background: C.panel, borderBottom: `1px solid ${C.line}`, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-      <div style={{ fontWeight: 800, fontSize: 20, color: C.accent }}>{STORE_NAME}</div>
-      <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-        {navViews.map((v) => (
-          <button key={v} onClick={() => setView(v)}
-            style={{ ...S.btnGhost, ...(view === v ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>
-            {VIEW_LABELS[v]}
-          </button>
-        ))}
+    <header style={{ background: C.panel, borderBottom: `1px solid ${C.line}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ fontWeight: 800, fontSize: 22, color: C.accent }}>{STORE_NAME}</div>
+      <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+        {navViews.map((v) => {
+          const on = view === v;
+          return (
+            <button key={v} onClick={() => setView(v)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                minWidth: 96, height: 64, padding: '6px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : C.panel2,
+                color: on ? C.accentText : C.text, fontWeight: 700, fontSize: 15, transition: 'background .12s',
+              }}>
+              <span style={{ fontSize: 24, lineHeight: 1 }}>{VIEW_ICONS[v]}</span>
+              <span>{VIEW_LABELS[v]}</span>
+            </button>
+          );
+        })}
       </nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 13, color: C.dim }}>{user.username} ({user.role})</span>
-        <button onClick={onLogout} style={S.btnGhost}>{ARABIC ? 'خروج' : 'Logout'}</button>
+        <button onClick={onLogout} style={{ ...S.btnGhost, height: 64, minWidth: 90, fontSize: 15 }}>{ARABIC ? 'خروج' : 'Logout'}</button>
       </div>
     </header>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// On-screen keyboard (touch screens) — drives whichever field is active.
+// ══════════════════════════════════════════════════════════════════════════════
+function OnScreenKeyboard({ onKey, onBackspace, onEnter, onClose }) {
+  const [caps, setCaps] = useState(false);
+  const rows = [
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+    ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+    ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+    ['z', 'x', 'c', 'v', 'b', 'n', 'm', '.', '_', '@'],
+  ];
+  const key = (label, onTap, flex = 1, extra = {}) => (
+    <button key={label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={onTap}
+      style={{ flex, minWidth: 0, height: 56, borderRadius: 10, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 20, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', userSelect: 'none', ...extra }}>
+      {label}
+    </button>
+  );
+  const cell = (ch) => key(caps ? ch.toUpperCase() : ch, () => onKey(caps ? ch.toUpperCase() : ch));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8 }}>
+          {i === 3 && key(caps ? '⇧' : '⇪', () => setCaps((c) => !c), 1.4, caps ? { background: C.accent, color: C.accentText } : {})}
+          {r.map(cell)}
+          {i === 3 && key('⌫', onBackspace, 1.4, { background: C.red, color: '#fff' })}
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8 }}>
+        {key(ARABIC ? 'إغلاق' : 'Hide', onClose, 1.4, { fontSize: 15 })}
+        {key('␣', () => onKey(' '), 4)}
+        {key(ARABIC ? 'دخول' : 'Enter', onEnter, 2, { background: C.green, color: C.accentText, fontSize: 16 })}
+      </div>
+    </div>
   );
 }
 
@@ -182,9 +229,11 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [active, setActive] = useState('username');   // which field the keyboard types into
+  const [kb, setKb] = useState(true);                 // on-screen keyboard visible
 
   const submit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setErr(''); setBusy(true);
     try {
       const u = await api.post('/auth/login', { username, password });
@@ -194,20 +243,31 @@ function Login({ onLogin }) {
     } finally { setBusy(false); }
   };
 
+  const setActiveValue = (fn) => (active === 'username' ? setUsername(fn) : setPassword(fn));
+  const onKey = (ch) => setActiveValue((v) => v + ch);
+  const onBackspace = () => setActiveValue((v) => v.slice(0, -1));
+
+  const fieldStyle = (name) => ({ ...S.input, fontSize: 17, padding: '14px 14px', ...(active === name && kb ? { borderColor: C.accent, boxShadow: `0 0 0 2px ${C.accent}33` } : {}) });
+
   return (
-    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <form onSubmit={submit} style={{ ...S.card, width: 340, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontWeight: 800, fontSize: 26, color: C.accent, textAlign: 'center' }}>{STORE_NAME}</div>
-        <div style={{ color: C.dim, fontSize: 13, textAlign: 'center', marginTop: -8 }}>{ARABIC ? 'تسجيل الدخول' : 'Sign in'}</div>
-        <input style={S.input} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} value={username} onChange={(e) => setUsername(e.target.value)} autoFocus autoCapitalize="off" />
-        <input style={S.input} type="password" placeholder={ARABIC ? 'كلمة المرور' : 'Password'} value={password} onChange={(e) => setPassword(e.target.value)} />
-        {err && <div style={{ color: C.red, fontSize: 13 }}>{err}</div>}
+    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif", padding: 16 }}>
+      <form onSubmit={submit} style={{ ...S.card, width: 'min(94vw, 460px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ fontWeight: 800, fontSize: 30, color: C.accent, textAlign: 'center' }}>{STORE_NAME}</div>
+        <div style={{ color: C.dim, fontSize: 14, textAlign: 'center', marginTop: -8 }}>{ARABIC ? 'تسجيل الدخول' : 'Sign in'}</div>
+        <input style={fieldStyle('username')} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} value={username}
+          onChange={(e) => setUsername(e.target.value)} onFocus={() => { setActive('username'); setKb(true); }}
+          autoFocus autoCapitalize="off" autoComplete="off" />
+        <input style={fieldStyle('password')} type="password" placeholder={ARABIC ? 'كلمة المرور' : 'Password'} value={password}
+          onChange={(e) => setPassword(e.target.value)} onFocus={() => { setActive('password'); setKb(true); }} autoComplete="off" />
+        {err && <div style={{ color: C.red, fontSize: 14 }}>{err}</div>}
         {process.env.REACT_APP_DEMO === '1' && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, fontSize: 12, color: C.dim, textAlign: 'center' }}>
             DEMO — no backend. Sign in: <b style={{ color: C.accent }}>admin</b> / any password<br />or <b style={{ color: C.accent }}>cashier</b> (limited views). Data is local to your browser.
           </div>
         )}
-        <button type="submit" disabled={busy} style={{ ...S.btn, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : (ARABIC ? 'دخول' : 'Login')}</button>
+        <button type="submit" disabled={busy} style={{ ...S.btn, padding: '16px', fontSize: 18, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : (ARABIC ? 'دخول' : 'Login')}</button>
+        {!kb && <button type="button" onClick={() => setKb(true)} style={{ ...S.btnGhost, padding: '12px' }}>{ARABIC ? 'إظهار لوحة المفاتيح' : 'Show keyboard'}</button>}
+        {kb && <OnScreenKeyboard onKey={onKey} onBackspace={onBackspace} onEnter={submit} onClose={() => setKb(false)} />}
       </form>
     </div>
   );
