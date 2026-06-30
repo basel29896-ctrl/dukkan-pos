@@ -137,7 +137,7 @@ export default function App() {
       <main style={{ flex: 1, padding: 16, maxWidth: 1180, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
         {view === 'sales' && <SalesView user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <InventoryView isAdmin={isAdmin} notify={notify} />}
-        {view === 'history' && allowed('history') && <HistoryView notify={notify} />}
+        {view === 'history' && allowed('history') && <HistoryView user={user} notify={notify} />}
         {view === 'reports' && allowed('reports') && <ReportsView notify={notify} />}
         {view === 'settings' && <SettingsView user={user} isAdmin={isAdmin} notify={notify} />}
       </main>
@@ -276,15 +276,19 @@ function Login({ onLogin }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Sales — scan → cart → checkout
 // ══════════════════════════════════════════════════════════════════════════════
+const HELD_KEY = 'dukkan_held_sales';
 function SalesView({ user, notify }) {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);          // [{id,barcode,name,price,qty}]
   const [scan, setScan] = useState('');
   const [search, setSearch] = useState('');
+  const [cat, setCat] = useState('all');
   const [pay, setPay] = useState('cash');
   const [tendered, setTendered] = useState('');
   const [newProduct, setNewProduct] = useState(null); // {barcode} → modal
   const [busy, setBusy] = useState(false);
+  const [held, setHeld] = useState(() => { try { return JSON.parse(localStorage.getItem(HELD_KEY)) || []; } catch (_) { return []; } });
+  const [showHeld, setShowHeld] = useState(false);
   const scanRef = useRef(null);
 
   const loadProducts = useCallback(async () => {
@@ -292,15 +296,12 @@ function SalesView({ user, notify }) {
   }, []);
   useEffect(() => { loadProducts(); }, [loadProducts]);
   useEffect(() => { scanRef.current && scanRef.current.focus(); }, []);
+  const persistHeld = (list) => { setHeld(list); localStorage.setItem(HELD_KEY, JSON.stringify(list)); };
 
   const addToCart = useCallback((p, qty = 1) => {
     setCart((prev) => {
       const i = prev.findIndex((l) => l.id === p.id);
-      if (i >= 0) {
-        const next = [...prev];
-        next[i] = { ...next[i], qty: next[i].qty + qty };
-        return next;
-      }
+      if (i >= 0) { const next = [...prev]; next[i] = { ...next[i], qty: next[i].qty + qty }; return next; }
       return [...prev, { id: p.id, barcode: p.barcode, name: p.name, price: Number(p.price) || 0, qty }];
     });
   }, []);
@@ -309,7 +310,6 @@ function SalesView({ user, notify }) {
     const c = String(code || '').trim();
     if (!c) return;
     setScan('');
-    // Fast path: already in the loaded catalogue.
     const local = products.find((p) => p.barcode && p.barcode === c);
     if (local) { addToCart(local); return; }
     try {
@@ -317,11 +317,8 @@ function SalesView({ user, notify }) {
       addToCart(p);
       setProducts((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
     } catch (ex) {
-      if (ex.status === 404) {
-        setNewProduct({ barcode: c });        // unknown code → quick-add modal
-      } else {
-        notify(ARABIC ? 'تعذّر البحث' : 'Lookup failed', 'red');
-      }
+      if (ex.status === 404) setNewProduct({ barcode: c });
+      else notify(ARABIC ? 'تعذّر البحث' : 'Lookup failed', 'red');
     }
   };
 
@@ -331,100 +328,133 @@ function SalesView({ user, notify }) {
   const total = cart.reduce((s, l) => s + l.price * l.qty, 0);
   const change = pay === 'cash' && tendered ? (Number(tendered) - total) : null;
 
+  // Hold the current cart for later; clear the screen for the next customer.
+  const holdSale = () => {
+    if (!cart.length) return;
+    persistHeld([...held, { id: uid(), items: cart, total, ts: new Date().toLocaleTimeString().slice(0, 5) }]);
+    setCart([]); setTendered('');
+    notify(ARABIC ? 'تم تعليق الفاتورة' : 'Sale held', 'green');
+  };
+  const resumeSale = (h) => {
+    if (cart.length && !window.confirm(ARABIC ? 'استبدال الفاتورة الحالية؟' : 'Replace current bill?')) return;
+    setCart(h.items); persistHeld(held.filter((x) => x.id !== h.id)); setShowHeld(false);
+  };
+
   const checkout = async () => {
     if (!cart.length || busy) return;
     setBusy(true);
     try {
       const invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
       const { date, time } = nowParts();
-      const sale = {
-        id: uid(), floor: DEFAULT_FLOOR, items: cart, sub: total, tax: 0, svc: 0,
-        disc: 0, total, pay, waiter: user.username, status: 'paid', date, time, invoice_no,
-      };
+      const sale = { id: uid(), floor: DEFAULT_FLOOR, items: cart, sub: total, tax: 0, svc: 0, disc: 0, total, pay, waiter: user.username, status: 'paid', date, time, invoice_no };
       await api.post('/orders', sale);
-      // Deduct stock per line (best-effort; sale already persisted).
-      await Promise.all(cart.map((l) =>
-        api.patch('/products/' + l.id + '/stock', { delta: -l.qty }).catch(() => {})
-      ));
+      await Promise.all(cart.map((l) => api.patch('/products/' + l.id + '/stock', { delta: -l.qty }).catch(() => {})));
       api.post('/stock-log', { kind: 'sale', changed_by: user.username, name: `invoice ${invoice_no}`, new_qty: cart.length }).catch(() => {});
       printReceipt(sale);
       setCart([]); setTendered(''); setPay('cash');
       loadProducts();
-      notify(ARABIC ? `تمت الفاتورة #${invoice_no}` : `Sale #${invoice_no} complete`, 'green');
+      notify(ARABIC ? `تمت الفاتورة #${invoice_no}` : `Sale #${invoice_no} done`, 'green');
       scanRef.current && scanRef.current.focus();
     } catch (ex) {
       notify(ex.message === 'invoice_taken' ? (ARABIC ? 'تعارض رقم الفاتورة، أعد المحاولة' : 'Invoice clash — retry') : (ARABIC ? 'فشل الدفع' : 'Checkout failed'), 'red');
     } finally { setBusy(false); }
   };
 
-  const filtered = search.trim()
-    ? products.filter((p) => (p.name || '').toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search)).slice(0, 30)
-    : [];
+  // Product tiles: filter by category chip + optional name/barcode search.
+  const cats = ['all', ...Array.from(new Set(products.map((p) => p.cat).filter(Boolean)))];
+  const tiles = products.filter((p) => {
+    if (cat !== 'all' && p.cat !== cat) return false;
+    if (search.trim()) { const q = search.toLowerCase(); return (p.name || '').toLowerCase().includes(q) || (p.barcode || '').includes(search); }
+    return true;
+  });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16, alignItems: 'start' }}>
-      {/* Left: scan + catalogue search */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={S.card}>
-          <label style={{ fontSize: 12, color: C.dim, fontWeight: 700 }}>{ARABIC ? 'امسح الباركود' : 'Scan barcode'}</label>
-          <input ref={scanRef} style={{ ...S.input, marginTop: 6, fontSize: 18, letterSpacing: 1 }}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 16, alignItems: 'start' }}>
+      {/* Left: scan + tap-to-add product tiles */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <input ref={scanRef} style={{ ...S.input, fontSize: 18, padding: '14px', letterSpacing: 1 }}
             value={scan} onChange={(e) => setScan(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') onScan(scan); }}
-            placeholder={ARABIC ? 'وجّه الماسح هنا…' : 'Focus here and scan…'} inputMode="numeric" />
+            placeholder={ARABIC ? '🔍 امسح الباركود أو اضغط منتجاً' : '🔍 Scan barcode or tap a product'} inputMode="search" />
+          {!!held.length && (
+            <button onClick={() => setShowHeld(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
+              ⏸ {ARABIC ? 'المعلّقة' : 'Held'} ({held.length})
+            </button>
+          )}
         </div>
-        <div style={S.card}>
-          <input style={S.input} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={ARABIC ? 'بحث بالاسم أو الباركود لإضافة يدوية' : 'Search name / barcode to add manually'} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-            {filtered.map((p) => (
-              <button key={p.id} onClick={() => { addToCart(p); setSearch(''); }} style={{ ...S.btnGhost, display: 'flex', justifyContent: 'space-between', textAlign: 'start' }}>
-                <span>{p.name} <span style={{ color: C.dim, fontSize: 12 }}>{p.barcode || ''}</span></span>
-                <span style={{ color: C.accent }}>{money(p.price)}</span>
-              </button>
-            ))}
-            {search.trim() && !filtered.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا نتائج' : 'No matches'}</div>}
-          </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {cats.map((c) => (
+            <button key={c} onClick={() => setCat(c)} style={{ ...S.btnGhost, padding: '10px 16px', fontSize: 14, ...(cat === c ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>
+              {c === 'all' ? (ARABIC ? 'الكل' : 'All') : c}
+            </button>
+          ))}
+        </div>
+
+        <input style={S.input} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={ARABIC ? 'ابحث بالاسم…' : 'Search by name…'} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+          {tiles.map((p) => (
+            <button key={p.id} onClick={() => addToCart(p)} style={{
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 6, minHeight: 86, padding: 12,
+              borderRadius: 12, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, cursor: 'pointer',
+              textAlign: 'start', fontFamily: 'inherit',
+            }}>
+              <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{p.name}</span>
+              <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: C.accent, fontWeight: 800, fontSize: 16 }}>{money(p.price)}</span>
+                {Number(p.stock) <= 5 && <span style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>● {Number(p.stock)}</span>}
+              </span>
+            </button>
+          ))}
+          {!tiles.length && <div style={{ color: C.dim, fontSize: 14, gridColumn: '1/-1', padding: 24, textAlign: 'center' }}>{ARABIC ? 'لا منتجات — أضفها من المخزون' : 'No products — add them in Inventory'}</div>}
         </div>
       </div>
 
       {/* Right: bill */}
-      <div style={{ ...S.card, position: 'sticky', top: 16 }}>
-        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>{ARABIC ? 'الفاتورة' : 'Bill'}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '46vh', overflow: 'auto' }}>
-          {!cart.length && <div style={{ color: C.dim, fontSize: 14, padding: '20px 0', textAlign: 'center' }}>{ARABIC ? 'امسح منتجاً للبدء' : 'Scan a product to begin'}</div>}
+      <div style={{ ...S.card, position: 'sticky', top: 16, padding: 18 }}>
+        <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 10 }}>🧾 {ARABIC ? 'الفاتورة' : 'Bill'}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '42vh', overflow: 'auto' }}>
+          {!cart.length && <div style={{ color: C.dim, fontSize: 15, padding: '28px 0', textAlign: 'center' }}>{ARABIC ? 'اضغط أو امسح منتجاً للبدء' : 'Tap or scan a product to start'}</div>}
           {cart.map((l) => (
-            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${C.line}` }}>
+            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.line}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
-                <div style={{ fontSize: 12, color: C.dim }}>{money(l.price)}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
+                <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>{money(l.price * l.qty)}</div>
               </div>
               <button onClick={() => setQty(l.id, l.qty - 1)} style={qtyBtn}>−</button>
-              <span style={{ minWidth: 22, textAlign: 'center', fontWeight: 700 }}>{l.qty}</span>
+              <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 800, fontSize: 16 }}>{l.qty}</span>
               <button onClick={() => setQty(l.id, l.qty + 1)} style={qtyBtn}>+</button>
-              <span style={{ minWidth: 78, textAlign: 'end', fontWeight: 700 }}>{money(l.price * l.qty)}</span>
-              <button onClick={() => removeLine(l.id)} style={{ ...qtyBtn, color: C.red }}>×</button>
+              <button onClick={() => removeLine(l.id)} style={{ ...qtyBtn, color: C.red, borderColor: C.red }}>×</button>
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 800, margin: '12px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 28, fontWeight: 800, margin: '14px 0' }}>
           <span>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ color: C.accent }}>{money(total)}</span>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           {['cash', 'card'].map((m) => (
-            <button key={m} onClick={() => setPay(m)} style={{ ...S.btnGhost, flex: 1, ...(pay === m ? { background: C.blue, color: '#fff', borderColor: C.blue } : {}) }}>
-              {m === 'cash' ? (ARABIC ? 'نقدي' : 'Cash') : (ARABIC ? 'بطاقة' : 'Card')}
+            <button key={m} onClick={() => setPay(m)} style={{ ...S.btnGhost, flex: 1, padding: '14px', fontSize: 16, ...(pay === m ? { background: C.blue, color: '#fff', borderColor: C.blue } : {}) }}>
+              {m === 'cash' ? (ARABIC ? '💵 نقدي' : '💵 Cash') : (ARABIC ? '💳 بطاقة' : '💳 Card')}
             </button>
           ))}
         </div>
         {pay === 'cash' && (
-          <div style={{ marginBottom: 8 }}>
-            <input style={S.input} type="number" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={ARABIC ? 'المبلغ المدفوع' : 'Cash tendered'} />
-            {change != null && change >= 0 && <div style={{ color: C.green, fontSize: 14, marginTop: 6, fontWeight: 700 }}>{ARABIC ? 'الباقي' : 'Change'}: {money(change)}</div>}
+          <div style={{ marginBottom: 10 }}>
+            <input style={{ ...S.input, fontSize: 16, padding: '14px' }} type="number" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={ARABIC ? 'المبلغ المدفوع' : 'Cash given'} />
+            {change != null && change >= 0 && <div style={{ color: C.green, fontSize: 18, marginTop: 8, fontWeight: 800 }}>{ARABIC ? 'الباقي' : 'Change'}: {money(change)}</div>}
           </div>
         )}
-        <button onClick={checkout} disabled={!cart.length || busy} style={{ ...S.btn, width: '100%', padding: '14px', fontSize: 16, opacity: (!cart.length || busy) ? 0.5 : 1 }}>
-          {busy ? '…' : (ARABIC ? 'إتمام البيع وطباعة' : 'Checkout & Print')}
+        <button onClick={checkout} disabled={!cart.length || busy} style={{ ...S.btn, width: '100%', padding: '18px', fontSize: 19, opacity: (!cart.length || busy) ? 0.5 : 1 }}>
+          {busy ? '…' : (ARABIC ? '✓ إتمام وطباعة' : '✓ Pay & Print')}
         </button>
-        {!!cart.length && <button onClick={() => setCart([])} style={{ ...S.btnGhost, width: '100%', marginTop: 8 }}>{ARABIC ? 'إلغاء الفاتورة' : 'Clear bill'}</button>}
+        {!!cart.length && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={holdSale} style={{ ...S.btnGhost, flex: 1, padding: '12px' }}>⏸ {ARABIC ? 'تعليق' : 'Hold'}</button>
+            <button onClick={() => { setCart([]); setTendered(''); }} style={{ ...S.btnGhost, flex: 1, padding: '12px', color: C.red }}>✕ {ARABIC ? 'إلغاء' : 'Clear'}</button>
+          </div>
+        )}
       </div>
 
       {newProduct && (
@@ -432,10 +462,28 @@ function SalesView({ user, notify }) {
           onClose={() => { setNewProduct(null); scanRef.current && scanRef.current.focus(); }}
           onSaved={(p) => { setProducts((prev) => [...prev, p]); addToCart(p); setNewProduct(null); scanRef.current && scanRef.current.focus(); }} />
       )}
+
+      {showHeld && (
+        <Overlay onClose={() => setShowHeld(false)}>
+          <div style={{ ...S.card, width: 360, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontWeight: 800, fontSize: 18 }}>⏸ {ARABIC ? 'الفواتير المعلّقة' : 'Held sales'}</div>
+            {!held.length && <div style={{ color: C.dim }}>{ARABIC ? 'لا شيء' : 'None'}</div>}
+            {held.map((h) => (
+              <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700 }}>{money(h.total)} <span style={{ color: C.dim, fontSize: 12 }}>· {h.items.length} {ARABIC ? 'صنف' : 'items'} · {h.ts}</span></div>
+                </div>
+                <button onClick={() => resumeSale(h)} style={{ ...S.btn, padding: '8px 14px' }}>{ARABIC ? 'استئناف' : 'Resume'}</button>
+                <button onClick={() => persistHeld(held.filter((x) => x.id !== h.id))} style={{ ...S.btnGhost, padding: '8px 10px', color: C.red }}>×</button>
+              </div>
+            ))}
+          </div>
+        </Overlay>
+      )}
     </div>
   );
 }
-const qtyBtn = { width: 30, height: 30, borderRadius: 7, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 18, lineHeight: '1', cursor: 'pointer', fontWeight: 700 };
+const qtyBtn = { width: 42, height: 42, borderRadius: 9, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 22, lineHeight: '1', cursor: 'pointer', fontWeight: 700 };
 
 // ── Add/Edit product modal (shared by Sales quick-add + Inventory) ──────────────
 function ProductModal({ initial, onClose, onSaved, notify, editing }) {
@@ -575,14 +623,36 @@ const td = { padding: '8px' };
 // ══════════════════════════════════════════════════════════════════════════════
 // History
 // ══════════════════════════════════════════════════════════════════════════════
-function HistoryView({ notify }) {
+function HistoryView({ user, notify }) {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
+  const [busyId, setBusyId] = useState(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
     api.get('/orders?floor=' + DEFAULT_FLOOR + '&limit=200')
       .then(setSales).catch(() => notify(ARABIC ? 'تعذّر تحميل السجل' : 'Failed to load history', 'red'))
       .finally(() => setLoading(false));
   }, [notify]);
+  useEffect(() => { load(); }, [load]);
+
+  // Refund a sale: record a reversing (negative) order and put the stock back.
+  const refund = async (s) => {
+    if (busyId || Number(s.total) < 0) return;
+    if (!window.confirm((ARABIC ? 'استرجاع فاتورة #' : 'Refund sale #') + s.invoice_no + ' — ' + money(s.total) + '?')) return;
+    setBusyId(s.id);
+    try {
+      const invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
+      const { date, time } = nowParts();
+      const r = { id: uid(), floor: DEFAULT_FLOOR, items: s.items, sub: -Number(s.total), tax: 0, svc: 0, disc: 0, total: -Number(s.total), pay: 'refund', waiter: user.username, status: 'refund', date, time, invoice_no, buyer: 'refund of #' + s.invoice_no };
+      await api.post('/orders', r);
+      await Promise.all((s.items || []).map((l) => l.id != null && api.patch('/products/' + l.id + '/stock', { delta: +l.qty }).catch(() => {})));
+      notify(ARABIC ? 'تم الاسترجاع' : 'Refunded', 'green');
+      load();
+    } catch (ex) {
+      notify(ARABIC ? 'فشل الاسترجاع' : 'Refund failed', 'red');
+    } finally { setBusyId(null); }
+  };
 
   if (loading) return <div style={{ color: C.dim }}>{ARABIC ? 'جارٍ التحميل…' : 'Loading…'}</div>;
   return (
@@ -593,16 +663,22 @@ function HistoryView({ notify }) {
           <th style={th}>{ARABIC ? 'الدفع' : 'Pay'}</th><th style={{ ...th, textAlign: 'right' }}>{ARABIC ? 'المجموع' : 'Total'}</th><th style={th}></th>
         </tr></thead>
         <tbody>
-          {sales.map((s) => (
-            <tr key={s.id} style={{ borderTop: `1px solid ${C.line}` }}>
-              <td style={td}>{s.invoice_no}</td>
-              <td style={{ ...td, color: C.dim }}>{s.date} {s.time}</td>
-              <td style={{ ...td, color: C.dim }}>{(s.items || []).reduce((n, l) => n + (l.qty || 0), 0)}</td>
-              <td style={td}>{s.pay}</td>
-              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{money(s.total)}</td>
-              <td style={{ ...td, textAlign: 'end' }}><button onClick={() => printReceipt(s)} style={{ ...S.btnGhost, padding: '5px 10px' }}>{ARABIC ? 'طباعة' : 'Print'}</button></td>
-            </tr>
-          ))}
+          {sales.map((s) => {
+            const isRefund = Number(s.total) < 0 || s.pay === 'refund';
+            return (
+              <tr key={s.id} style={{ borderTop: `1px solid ${C.line}`, opacity: isRefund ? 0.7 : 1 }}>
+                <td style={td}>{s.invoice_no}</td>
+                <td style={{ ...td, color: C.dim }}>{s.date} {s.time}</td>
+                <td style={{ ...td, color: C.dim }}>{(s.items || []).reduce((n, l) => n + (l.qty || 0), 0)}</td>
+                <td style={td}>{isRefund ? (ARABIC ? '↩ استرجاع' : '↩ refund') : s.pay}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isRefund ? C.red : C.text }}>{money(s.total)}</td>
+                <td style={{ ...td, textAlign: 'end', whiteSpace: 'nowrap' }}>
+                  <button onClick={() => printReceipt(s)} style={{ ...S.btnGhost, padding: '6px 12px' }}>{ARABIC ? 'طباعة' : 'Print'}</button>
+                  {!isRefund && <button onClick={() => refund(s)} disabled={busyId === s.id} style={{ ...S.btnGhost, padding: '6px 12px', color: C.red, marginInlineStart: 6 }}>{busyId === s.id ? '…' : (ARABIC ? 'استرجاع' : 'Refund')}</button>}
+                </td>
+              </tr>
+            );
+          })}
           {!sales.length && <tr><td colSpan={6} style={{ ...td, color: C.dim, textAlign: 'center', padding: 24 }}>{ARABIC ? 'لا مبيعات بعد' : 'No sales yet'}</td></tr>}
         </tbody>
       </table>
