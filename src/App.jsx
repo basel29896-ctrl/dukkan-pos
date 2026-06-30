@@ -286,6 +286,8 @@ function SalesView({ user, notify }) {
   const [pay, setPay] = useState('cash');
   const [tendered, setTendered] = useState('');
   const [newProduct, setNewProduct] = useState(null); // {barcode} → modal
+  const [editLine, setEditLine] = useState(null);      // cart line → qty/price keypad
+  const [quickItem, setQuickItem] = useState(false);   // open-price misc item modal
   const [busy, setBusy] = useState(false);
   const [held, setHeld] = useState(() => { try { return JSON.parse(localStorage.getItem(HELD_KEY)) || []; } catch (_) { return []; } });
   const [showHeld, setShowHeld] = useState(false);
@@ -323,7 +325,9 @@ function SalesView({ user, notify }) {
   };
 
   const setQty = (id, qty) => setCart((prev) => prev.flatMap((l) => (l.id === id ? (qty <= 0 ? [] : [{ ...l, qty }]) : [l])));
+  const setLine = (id, patch) => setCart((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   const removeLine = (id) => setCart((prev) => prev.filter((l) => l.id !== id));
+  const addCustom = ({ name, price, qty }) => setCart((prev) => [...prev, { id: 'misc-' + uid(), barcode: null, name, price: Number(price) || 0, qty: Number(qty) || 1, custom: true }]);
 
   const total = cart.reduce((s, l) => s + l.price * l.qty, 0);
   const change = pay === 'cash' && tendered ? (Number(tendered) - total) : null;
@@ -348,7 +352,8 @@ function SalesView({ user, notify }) {
       const { date, time } = nowParts();
       const sale = { id: uid(), floor: DEFAULT_FLOOR, items: cart, sub: total, tax: 0, svc: 0, disc: 0, total, pay, waiter: user.username, status: 'paid', date, time, invoice_no };
       await api.post('/orders', sale);
-      await Promise.all(cart.map((l) => api.patch('/products/' + l.id + '/stock', { delta: -l.qty }).catch(() => {})));
+      // Only deduct stock for real catalogue products (numeric id); custom/open-price lines have string ids.
+      await Promise.all(cart.filter((l) => typeof l.id === 'number').map((l) => api.patch('/products/' + l.id + '/stock', { delta: -l.qty }).catch(() => {})));
       api.post('/stock-log', { kind: 'sale', changed_by: user.username, name: `invoice ${invoice_no}`, new_qty: cart.length }).catch(() => {});
       printReceipt(sale);
       setCart([]); setTendered(''); setPay('cash');
@@ -377,6 +382,9 @@ function SalesView({ user, notify }) {
             value={scan} onChange={(e) => setScan(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') onScan(scan); }}
             placeholder={ARABIC ? '🔍 امسح الباركود أو اضغط منتجاً' : '🔍 Scan barcode or tap a product'} inputMode="search" />
+          <button onClick={() => setQuickItem(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
+            ＋ {ARABIC ? 'صنف يدوي' : 'Quick item'}
+          </button>
           {!!held.length && (
             <button onClick={() => setShowHeld(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
               ⏸ {ARABIC ? 'المعلّقة' : 'Held'} ({held.length})
@@ -419,10 +427,10 @@ function SalesView({ user, notify }) {
           {!cart.length && <div style={{ color: C.dim, fontSize: 15, padding: '28px 0', textAlign: 'center' }}>{ARABIC ? 'اضغط أو امسح منتجاً للبدء' : 'Tap or scan a product to start'}</div>}
           {cart.map((l) => (
             <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.line}` }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
-                <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>{money(l.price * l.qty)}</div>
-              </div>
+              <button onClick={() => setEditLine(l)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', textAlign: 'start', cursor: 'pointer', color: C.text, fontFamily: 'inherit', padding: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name} <span style={{ fontSize: 12, color: C.dim }}>✎</span></div>
+                <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>{money(l.price)} × {l.qty} = {money(l.price * l.qty)}</div>
+              </button>
               <button onClick={() => setQty(l.id, l.qty - 1)} style={qtyBtn}>−</button>
               <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 800, fontSize: 16 }}>{l.qty}</span>
               <button onClick={() => setQty(l.id, l.qty + 1)} style={qtyBtn}>+</button>
@@ -443,7 +451,14 @@ function SalesView({ user, notify }) {
         {pay === 'cash' && (
           <div style={{ marginBottom: 10 }}>
             <input style={{ ...S.input, fontSize: 16, padding: '14px' }} type="number" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={ARABIC ? 'المبلغ المدفوع' : 'Cash given'} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 8 }}>
+              <button onClick={() => setTendered(String(total.toFixed(3)))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 800 }}>{ARABIC ? 'بالضبط' : 'Exact'}</button>
+              {[1, 5, 10, 20, 50].map((d) => (
+                <button key={d} onClick={() => setTendered(String(d))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 700 }}>{d}</button>
+              ))}
+            </div>
             {change != null && change >= 0 && <div style={{ color: C.green, fontSize: 18, marginTop: 8, fontWeight: 800 }}>{ARABIC ? 'الباقي' : 'Change'}: {money(change)}</div>}
+            {change != null && change < 0 && <div style={{ color: C.red, fontSize: 15, marginTop: 8, fontWeight: 700 }}>{ARABIC ? 'ناقص' : 'Short'}: {money(-change)}</div>}
           </div>
         )}
         <button onClick={checkout} disabled={!cart.length || busy} style={{ ...S.btn, width: '100%', padding: '18px', fontSize: 19, opacity: (!cart.length || busy) ? 0.5 : 1 }}>
@@ -480,10 +495,91 @@ function SalesView({ user, notify }) {
           </div>
         </Overlay>
       )}
+
+      {editLine && (
+        <LineEditModal line={editLine}
+          onClose={() => setEditLine(null)}
+          onApply={(qty, price) => { if (qty <= 0) removeLine(editLine.id); else setLine(editLine.id, { qty, price }); setEditLine(null); }}
+          onRemove={() => { removeLine(editLine.id); setEditLine(null); }} />
+      )}
+      {quickItem && (
+        <QuickItemModal notify={notify} onClose={() => setQuickItem(false)}
+          onAdd={(it) => { addCustom(it); setQuickItem(false); }} />
+      )}
     </div>
   );
 }
 const qtyBtn = { width: 42, height: 42, borderRadius: 9, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 22, lineHeight: '1', cursor: 'pointer', fontWeight: 700 };
+
+// ── Numeric keypad (touch) — drives a numeric string field ──────────────────────
+function NumPad({ onKey, onClear, onBackspace }) {
+  const k = (label, fn, extra = {}) => (
+    <button key={label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={fn}
+      style={{ height: 56, borderRadius: 10, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 22, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', ...extra }}>{label}</button>
+  );
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+      {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => k(d, () => onKey(d)))}
+      {k('.', () => onKey('.'))}
+      {k('0', () => onKey('0'))}
+      {k('⌫', onBackspace, { background: C.red, color: '#fff' })}
+      {k('C', onClear, { gridColumn: '1 / -1', background: C.line })}
+    </div>
+  );
+}
+
+// ── Edit a cart line: set quantity + override price via keypad ───────────────────
+function LineEditModal({ line, onClose, onApply, onRemove }) {
+  const [field, setField] = useState('qty');
+  const [qty, setQty] = useState(String(line.qty));
+  const [price, setPrice] = useState(String(line.price));
+  const set = field === 'qty' ? setQty : setPrice;
+  const onKey = (ch) => set((v) => (ch === '.' && v.includes('.') ? v : (v === '0' && ch !== '.' ? ch : v + ch)));
+  const tab = (name, label, val) => (
+    <button type="button" onClick={() => setField(name)} style={{ flex: 1, padding: '12px', borderRadius: 8, border: `1px solid ${field === name ? C.accent : C.line}`, background: field === name ? C.accent : C.panel2, color: field === name ? C.accentText : C.text, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+      <div style={{ fontSize: 12 }}>{label}</div><div style={{ fontSize: 18 }}>{val || '0'}</div>
+    </button>
+  );
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>{line.name}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {tab('qty', ARABIC ? 'الكمية' : 'Qty', qty)}
+          {tab('price', ARABIC ? 'السعر' : 'Price', price)}
+        </div>
+        <NumPad onKey={onKey} onClear={() => set('')} onBackspace={() => set((v) => v.slice(0, -1))} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => onApply(Number(qty) || 0, Number(price) || 0)} style={{ ...S.btn, flex: 1, padding: '14px', fontSize: 16 }}>{ARABIC ? 'حفظ' : 'Save'}</button>
+          <button onClick={onRemove} style={{ ...S.btnGhost, padding: '14px', color: C.red }}>{ARABIC ? 'حذف' : 'Remove'}</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+// ── Open-price "misc" item: type a name + price for something with no barcode ────
+function QuickItemModal({ onClose, onAdd, notify }) {
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const onKey = (ch) => setPrice((v) => (ch === '.' && v.includes('.') ? v : v + ch));
+  const submit = () => {
+    if (!name.trim()) { notify(ARABIC ? 'الاسم مطلوب' : 'Name required', 'red'); return; }
+    if (!(Number(price) > 0)) { notify(ARABIC ? 'السعر مطلوب' : 'Price required', 'red'); return; }
+    onAdd({ name: name.trim(), price: Number(price), qty: 1 });
+  };
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>{ARABIC ? 'صنف يدوي' : 'Quick item'}</div>
+        <input style={S.input} value={name} onChange={(e) => setName(e.target.value)} placeholder={ARABIC ? 'الاسم' : 'Name'} autoFocus />
+        <div style={{ ...S.input, fontSize: 20, fontWeight: 800, textAlign: 'center', color: C.accent }}>{price || '0'}</div>
+        <NumPad onKey={onKey} onClear={() => setPrice('')} onBackspace={() => setPrice((v) => v.slice(0, -1))} />
+        <button onClick={submit} style={{ ...S.btn, padding: '14px', fontSize: 16 }}>{ARABIC ? 'إضافة للفاتورة' : 'Add to bill'}</button>
+      </div>
+    </Overlay>
+  );
+}
 
 // ── Add/Edit product modal (shared by Sales quick-add + Inventory) ──────────────
 function ProductModal({ initial, onClose, onSaved, notify, editing }) {
