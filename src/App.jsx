@@ -371,9 +371,15 @@ function Login({ onLogin }) {
 
   const fieldStyle = (name) => ({ ...S.input, fontSize: 17, padding: '14px 14px', ...(active === name && kb ? { borderColor: C.accent, boxShadow: `0 0 0 2px ${C.accent}33` } : {}) });
 
+  const bg = (process.env.PUBLIC_URL || '') + '/login-bg.png';
   return (
-    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif", padding: 16 }}>
-      <form onSubmit={submit} style={{ ...S.card, width: 'min(94vw, 460px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div dir="ltr" style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+      fontFamily: "'DM Sans', system-ui, sans-serif", padding: 'clamp(16px, 4vw, 64px)',
+      backgroundImage: `linear-gradient(90deg, rgba(15,17,23,.10) 0%, rgba(15,17,23,.45) 50%, rgba(15,17,23,.85) 100%), url(${bg})`,
+      backgroundSize: 'cover', backgroundPosition: 'center',
+    }}>
+      <form onSubmit={submit} dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, width: 'min(94vw, 440px)', display: 'flex', flexDirection: 'column', gap: 14, backdropFilter: 'blur(6px)', background: 'rgba(26,28,37,.92)', boxShadow: '0 20px 60px rgba(0,0,0,.55)' }}>
         <div style={{ fontWeight: 800, fontSize: 30, color: C.accent, textAlign: 'center' }}>{STORE_NAME}</div>
         <div style={{ color: C.dim, fontSize: 14, textAlign: 'center', marginTop: -8 }}>{ARABIC ? 'تسجيل الدخول' : 'Sign in'}</div>
         <input style={fieldStyle('username')} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} value={username}
