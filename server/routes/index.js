@@ -17,5 +17,6 @@ router.use('/', require('./products'));
 router.use('/', require('./suppliers'));
 router.use('/', require('./accounts'));
 router.use('/', require('./reports'));
+router.use('/', require('./timeclock'));
 
 module.exports = router;

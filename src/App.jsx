@@ -77,7 +77,9 @@ function escapeHtml(s) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Root
 // ══════════════════════════════════════════════════════════════════════════════
+const BC_NAME = 'dukkan_pos';
 export default function App() {
+  const isDisplay = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('display') === '1';
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
   const [view, setView] = useState('sales');
@@ -124,6 +126,7 @@ export default function App() {
     setUser(null);
   };
 
+  if (isDisplay) return <CustomerDisplay />;
   if (booting) return <Centered>{ARABIC ? 'جارٍ التحميل…' : 'Loading…'}</Centered>;
   if (!user) return <Login onLogin={handleLogin} />;
 
@@ -138,7 +141,7 @@ export default function App() {
 
   return (
     <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', flexDirection: 'column' }}>
-      <Header user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout} />
+      <Header user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout} canSeeStock={allowed('inventory') || allowed('reports')} />
       <main style={{ flex: 1, padding: 16, maxWidth: 1180, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
         {view === 'sales' && <SalesView user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <InventoryView isAdmin={isAdmin} notify={notify} />}
@@ -160,8 +163,93 @@ function Centered({ children }) {
   return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.dim, fontFamily: "'DM Sans', system-ui, sans-serif" }}>{children}</div>;
 }
 
+// ── Customer-facing display (open ?display=1 on a 2nd screen) ────────────────────
+// Mirrors the live cart from the Sales screen via BroadcastChannel (+ localStorage fallback).
+function CustomerDisplay() {
+  const [state, setState] = useState(() => { try { return JSON.parse(localStorage.getItem('dukkan_display')) || null; } catch (_) { return null; } });
+  useEffect(() => {
+    let bc;
+    try { bc = new BroadcastChannel(BC_NAME); bc.onmessage = (e) => setState(e.data); } catch (_) {}
+    const onStorage = (e) => { if (e.key === 'dukkan_display' && e.newValue) { try { setState(JSON.parse(e.newValue)); } catch (_) {} } };
+    window.addEventListener('storage', onStorage);
+    return () => { if (bc) bc.close(); window.removeEventListener('storage', onStorage); };
+  }, []);
+  const items = (state && state.items) || [];
+  const total = (state && state.total) || 0;
+  return (
+    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', flexDirection: 'column', padding: 28 }}>
+      <div style={{ fontWeight: 800, fontSize: 40, color: C.accent, textAlign: 'center', marginBottom: 18 }}>{STORE_NAME}</div>
+      <div style={{ flex: 1, overflow: 'auto', maxWidth: 720, width: '100%', margin: '0 auto' }}>
+        {!items.length && <div style={{ color: C.dim, fontSize: 26, textAlign: 'center', marginTop: 80 }}>{ARABIC ? 'أهلاً بك' : 'Welcome'}</div>}
+        {items.map((l, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: `1px solid ${C.line}`, fontSize: 26 }}>
+            <span>{l.name} <span style={{ color: C.dim, fontSize: 20 }}>× {l.qty}</span></span>
+            <span style={{ fontWeight: 700 }}>{money(l.price * l.qty)}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ maxWidth: 720, width: '100%', margin: '0 auto', borderTop: `2px solid ${C.accent}`, paddingTop: 16, display: 'flex', justifyContent: 'space-between', fontSize: 48, fontWeight: 800 }}>
+        <span>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ color: C.accent }}>{money(total)}</span>
+      </div>
+      {state && state.change != null && state.change >= 0 && (
+        <div style={{ maxWidth: 720, width: '100%', margin: '6px auto 0', display: 'flex', justifyContent: 'space-between', fontSize: 30, color: C.green, fontWeight: 700 }}>
+          <span>{ARABIC ? 'الباقي' : 'Change'}</span><span>{money(state.change)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const VIEW_ICONS = { sales: '🛒', inventory: '📦', receive: '📥', history: '🧾', reports: '📊', settings: '⚙️' };
-function Header({ user, view, setView, navViews, onLogout }) {
+
+// Clock In/Out for the logged-in employee.
+function ClockButton() {
+  const [open, setOpen] = useState(null); // open punch or null
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api.get('/timeclock/status').then(setOpen).catch(() => {}); }, []);
+  const toggle = async () => {
+    setBusy(true);
+    try {
+      if (open) { await api.post('/timeclock/out'); setOpen(null); }
+      else { await api.post('/timeclock/in'); api.get('/timeclock/status').then(setOpen); }
+    } catch (_) {} finally { setBusy(false); }
+  };
+  return (
+    <button onClick={toggle} disabled={busy} style={{ ...S.btnGhost, height: 64, fontSize: 14, ...(open ? { borderColor: C.green, color: C.green } : {}) }}>
+      {open ? (ARABIC ? '🟢 خروج' : '🟢 Clock Out') : (ARABIC ? '🕐 دخول' : '🕐 Clock In')}
+    </button>
+  );
+}
+
+// Bell badge: low-stock + expiring counts, with a dropdown list.
+function NotificationsBell() {
+  const [low, setLow] = useState([]);
+  const [exp, setExp] = useState([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    api.get('/reports/low-stock?threshold=5').then(setLow).catch(() => {});
+    api.get('/expiry?days=14').then(setExp).catch(() => {});
+  }, []);
+  const count = low.length + exp.length;
+  return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setOpen((o) => !o)} style={{ ...S.btnGhost, height: 64, fontSize: 20, position: 'relative' }}>
+        🔔{count > 0 && <span style={{ position: 'absolute', top: 6, insetInlineEnd: 6, background: C.red, color: '#fff', borderRadius: 10, fontSize: 11, fontWeight: 800, padding: '1px 6px' }}>{count}</span>}
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', insetInlineEnd: 0, top: 70, width: 300, maxHeight: 360, overflow: 'auto', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, zIndex: 1000, boxShadow: '0 8px 30px rgba(0,0,0,.5)' }}>
+          <div style={{ fontWeight: 800, marginBottom: 6, color: C.red }}>{ARABIC ? 'مخزون منخفض' : 'Low stock'} ({low.length})</div>
+          {low.slice(0, 8).map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}><span>{p.name}</span><span style={{ color: C.red }}>{Number(p.stock)}</span></div>)}
+          <div style={{ fontWeight: 800, margin: '10px 0 6px', color: C.accent }}>{ARABIC ? 'قرب الانتهاء' : 'Expiring'} ({exp.length})</div>
+          {exp.slice(0, 8).map((e) => <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}><span>{e.product}</span><span style={{ color: Number(e.days_left) < 0 ? C.red : C.accent }}>{e.expiry}</span></div>)}
+          {!count && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا تنبيهات' : 'All good'}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Header({ user, view, setView, navViews, onLogout, canSeeStock }) {
   return (
     <header style={{ background: C.panel, borderBottom: `1px solid ${C.line}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <div style={{ fontWeight: 800, fontSize: 22, color: C.accent }}>{STORE_NAME}</div>
@@ -183,7 +271,9 @@ function Header({ user, view, setView, navViews, onLogout }) {
         })}
       </nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 13, color: C.dim }}>{user.username} ({user.role})</span>
+        {canSeeStock && <NotificationsBell />}
+        <ClockButton />
+        <span style={{ fontSize: 13, color: C.dim }}>{user.full_name || user.username}</span>
         <button onClick={onLogout} style={{ ...S.btnGhost, height: 64, minWidth: 90, fontSize: 15 }}>{ARABIC ? 'خروج' : 'Logout'}</button>
       </div>
     </header>
@@ -372,6 +462,14 @@ function SalesView({ user, notify }) {
   const total = cart.reduce((s, l) => s + l.price * l.qty, 0);
   const change = pay === 'cash' && tendered ? (Number(tendered) - total) : null;
 
+  // Push the live cart to the customer-facing display (2nd screen).
+  useEffect(() => {
+    const payload = { items: cart.map((l) => ({ name: l.name, price: l.price, qty: l.qty })), total, change, store: STORE_NAME };
+    try { localStorage.setItem('dukkan_display', JSON.stringify(payload)); } catch (_) {}
+    try { const bc = new BroadcastChannel(BC_NAME); bc.postMessage(payload); bc.close(); } catch (_) {}
+  }, [cart, total, change]);
+  const openDisplay = () => window.open(window.location.pathname + '?display=1', 'dukkan_customer', 'width=900,height=700');
+
   // Hold the current cart for later; clear the screen for the next customer.
   const holdSale = () => {
     if (!cart.length) return;
@@ -425,6 +523,7 @@ function SalesView({ user, notify }) {
           <button onClick={() => setQuickItem(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
             ＋ {ARABIC ? 'صنف يدوي' : 'Quick item'}
           </button>
+          <button onClick={openDisplay} title={ARABIC ? 'شاشة الزبون' : 'Customer screen'} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>🖥</button>
           {!!held.length && (
             <button onClick={() => setShowHeld(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
               ⏸ {ARABIC ? 'المعلّقة' : 'Held'} ({held.length})
@@ -886,6 +985,7 @@ function HistoryView({ user, notify }) {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [returning, setReturning] = useState(null); // sale being returned
 
   const load = useCallback(() => {
     setLoading(true);
@@ -895,22 +995,21 @@ function HistoryView({ user, notify }) {
   }, [notify]);
   useEffect(() => { load(); }, [load]);
 
-  // Refund a sale: record a reversing (negative) order and put the stock back.
-  const refund = async (s) => {
-    if (busyId || Number(s.total) < 0) return;
-    if (!window.confirm((ARABIC ? 'استرجاع فاتورة #' : 'Refund sale #') + s.invoice_no + ' — ' + money(s.total) + '?')) return;
-    setBusyId(s.id);
+  // Process a (full or partial) return: record a reversing order for the chosen lines + restore stock.
+  const doReturn = async (sale, lines) => {
+    const items = lines.filter((l) => l.qty > 0);
+    if (!items.length) { setReturning(null); return; }
+    const refundTotal = items.reduce((s, l) => s + l.price * l.qty, 0);
+    setBusyId(sale.id);
     try {
       const invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
       const { date, time } = nowParts();
-      const r = { id: uid(), floor: DEFAULT_FLOOR, items: s.items, sub: -Number(s.total), tax: 0, svc: 0, disc: 0, total: -Number(s.total), pay: 'refund', waiter: user.username, status: 'refund', date, time, invoice_no, buyer: 'refund of #' + s.invoice_no };
+      const r = { id: uid(), floor: DEFAULT_FLOOR, items, sub: -refundTotal, tax: 0, svc: 0, disc: 0, total: -refundTotal, pay: 'refund', waiter: user.username, status: 'refund', date, time, invoice_no, buyer: 'return of #' + sale.invoice_no };
       await api.post('/orders', r);
-      await Promise.all((s.items || []).map((l) => l.id != null && api.patch('/products/' + l.id + '/stock', { delta: +l.qty }).catch(() => {})));
-      notify(ARABIC ? 'تم الاسترجاع' : 'Refunded', 'green');
-      load();
-    } catch (ex) {
-      notify(ARABIC ? 'فشل الاسترجاع' : 'Refund failed', 'red');
-    } finally { setBusyId(null); }
+      await Promise.all(items.map((l) => typeof l.id === 'number' && api.patch('/products/' + l.id + '/stock', { delta: +l.qty }).catch(() => {})));
+      notify(ARABIC ? 'تم الاسترجاع' : 'Returned', 'green');
+      setReturning(null); load();
+    } catch (ex) { notify(ARABIC ? 'فشل الاسترجاع' : 'Return failed', 'red'); } finally { setBusyId(null); }
   };
 
   if (loading) return <div style={{ color: C.dim }}>{ARABIC ? 'جارٍ التحميل…' : 'Loading…'}</div>;
@@ -933,7 +1032,7 @@ function HistoryView({ user, notify }) {
                 <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isRefund ? C.red : C.text }}>{money(s.total)}</td>
                 <td style={{ ...td, textAlign: 'end', whiteSpace: 'nowrap' }}>
                   <button onClick={() => printReceipt(s)} style={{ ...S.btnGhost, padding: '6px 12px' }}>{ARABIC ? 'طباعة' : 'Print'}</button>
-                  {!isRefund && <button onClick={() => refund(s)} disabled={busyId === s.id} style={{ ...S.btnGhost, padding: '6px 12px', color: C.red, marginInlineStart: 6 }}>{busyId === s.id ? '…' : (ARABIC ? 'استرجاع' : 'Refund')}</button>}
+                  {!isRefund && <button onClick={() => setReturning(s)} disabled={busyId === s.id} style={{ ...S.btnGhost, padding: '6px 12px', color: C.red, marginInlineStart: 6 }}>{busyId === s.id ? '…' : (ARABIC ? 'استرجاع' : 'Return')}</button>}
                 </td>
               </tr>
             );
@@ -941,7 +1040,38 @@ function HistoryView({ user, notify }) {
           {!sales.length && <tr><td colSpan={6} style={{ ...td, color: C.dim, textAlign: 'center', padding: 24 }}>{ARABIC ? 'لا مبيعات بعد' : 'No sales yet'}</td></tr>}
         </tbody>
       </table>
+      {returning && <ReturnModal sale={returning} busy={busyId === returning.id} onClose={() => setReturning(null)} onConfirm={(lines) => doReturn(returning, lines)} />}
     </div>
+  );
+}
+
+// Pick how many of each line to return (defaults to full quantity).
+function ReturnModal({ sale, onClose, onConfirm, busy }) {
+  const [qty, setQty] = useState(() => (sale.items || []).map((l) => Number(l.qty) || 0));
+  const lines = (sale.items || []).map((l, i) => ({ ...l, qty: qty[i] }));
+  const refundTotal = lines.reduce((s, l) => s + (Number(l.price) || 0) * l.qty, 0);
+  const setI = (i, v) => setQty((q) => q.map((x, j) => (j === i ? Math.max(0, Math.min(Number(sale.items[i].qty) || 0, v)) : x)));
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ ...S.card, width: 380, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>↩ {ARABIC ? 'استرجاع فاتورة' : 'Return sale'} #{sale.invoice_no}</div>
+        {(sale.items || []).map((l, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1 }}>{l.name} <span style={{ color: C.dim, fontSize: 12 }}>({ARABIC ? 'بيع' : 'sold'} {Number(l.qty)})</span></span>
+            <button onClick={() => setI(i, qty[i] - 1)} style={qtyBtn}>−</button>
+            <span style={{ minWidth: 26, textAlign: 'center', fontWeight: 700 }}>{qty[i]}</span>
+            <button onClick={() => setI(i, qty[i] + 1)} style={qtyBtn}>+</button>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 18, marginTop: 4 }}>
+          <span>{ARABIC ? 'مبلغ الاسترجاع' : 'Refund'}</span><span style={{ color: C.red }}>{money(refundTotal)}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => onConfirm(lines)} disabled={busy || refundTotal <= 0} style={{ ...S.btn, flex: 1, padding: '14px', opacity: busy || refundTotal <= 0 ? 0.5 : 1 }}>{ARABIC ? 'تأكيد الاسترجاع' : 'Confirm return'}</button>
+          <button onClick={onClose} style={{ ...S.btnGhost, padding: '14px' }}>{ARABIC ? 'إلغاء' : 'Cancel'}</button>
+        </div>
+      </div>
+    </Overlay>
   );
 }
 
@@ -956,6 +1086,9 @@ function ReportsView({ notify }) {
   const [top, setTop] = useState([]);
   const [low, setLow] = useState([]);
   const [exp, setExp] = useState([]);
+  const [abc, setAbc] = useState([]);
+  const [zrep, setZrep] = useState(null);
+  const [hours, setHours] = useState([]);
 
   const load = useCallback(() => {
     const qs = `?from=${from}&to=${to}`;
@@ -963,14 +1096,36 @@ function ReportsView({ notify }) {
     api.get('/reports/top-products' + qs + '&limit=10').then(setTop).catch(() => {});
     api.get('/reports/low-stock?threshold=5').then(setLow).catch(() => {});
     api.get('/expiry?days=30').then(setExp).catch(() => {});
+    api.get('/reports/abc' + qs).then(setAbc).catch(() => {});
+    api.get('/reports/zreport?date=' + to).then(setZrep).catch(() => {});
+    api.get('/timeclock' + qs).then(setHours).catch(() => {});
   }, [from, to, notify]);
   useEffect(() => { load(); }, [load]);
+
+  // Export the sales in the selected range to a CSV the owner can hand to an accountant.
+  const exportCSV = async () => {
+    try {
+      const all = await api.get('/orders?floor=' + DEFAULT_FLOOR + '&limit=100000');
+      const rows = all.filter((o) => { const d = o.date || (o.created_at || '').slice(0, 10); return d >= from && d <= to; });
+      const head = ['invoice_no', 'date', 'time', 'payment', 'items', 'total'];
+      const body = rows.map((o) => [o.invoice_no, o.date, o.time, o.pay, (o.items || []).reduce((n, l) => n + (l.qty || 0), 0), Number(o.total).toFixed(3)]);
+      const csv = [head, ...body].map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a'); a.href = url; a.download = `dukkan-sales_${from}_${to}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (_) { notify(ARABIC ? 'فشل التصدير' : 'Export failed', 'red'); }
+  };
+
+  // Aggregate clocked hours per employee.
+  const hoursByUser = Object.values(hours.reduce((m, h) => { (m[h.username] = m[h.username] || { username: h.username, hours: 0 }).hours += Number(h.hours) || 0; return m; }, {}));
+  const abcClass = (c) => abc.filter((x) => x.class === c);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
         <Field label={ARABIC ? 'من' : 'From'}><input style={S.input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label={ARABIC ? 'إلى' : 'To'}><input style={S.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+        <button onClick={exportCSV} style={{ ...S.btnGhost, height: 42 }}>⬇ {ARABIC ? 'تصدير CSV' : 'Export CSV'}</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
         <Stat label={ARABIC ? 'الإيراد' : 'Revenue'} value={money(sum && sum.revenue)} accent />
@@ -1010,6 +1165,47 @@ function ReportsView({ notify }) {
           );
         })}
         {!exp.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا شيء قريب الانتهاء' : 'Nothing expiring soon'}</div>}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {/* Z-report: daily close-out by payment method */}
+        <div style={S.card}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>🧮 {ARABIC ? 'تقرير اليوم (إغلاق)' : 'Z-Report (close-out)'} — {to}</div>
+          {zrep && zrep.lines.map((l) => (
+            <div key={l.pay} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
+              <span style={{ textTransform: 'capitalize' }}>{l.pay} <span style={{ color: C.dim, fontSize: 12 }}>×{l.orders}</span></span><span style={{ fontWeight: 700 }}>{money(l.total)}</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, fontWeight: 800 }}>
+            <span>{ARABIC ? 'الصافي' : 'Net'}</span><span style={{ color: C.accent }}>{money(zrep && zrep.net)}</span>
+          </div>
+        </div>
+        {/* Employee hours */}
+        <div style={S.card}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>🕐 {ARABIC ? 'ساعات الموظفين' : 'Employee hours'}</div>
+          {hoursByUser.map((h) => (
+            <div key={h.username} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
+              <span>{h.username}</span><span style={{ color: C.dim }}>{h.hours.toFixed(2)} {ARABIC ? 'ساعة' : 'h'}</span>
+            </div>
+          ))}
+          {!hoursByUser.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا سجلّات' : 'No punches'}</div>}
+        </div>
+      </div>
+
+      {/* ABC analysis */}
+      <div style={S.card}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>🅰 {ARABIC ? 'تحليل ABC (مساهمة الإيراد)' : 'ABC analysis (revenue contribution)'}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          {[['A', C.green, ARABIC ? 'الأهم (٨٠٪)' : 'Top (80%)'], ['B', C.accent, ARABIC ? 'متوسط (١٥٪)' : 'Mid (15%)'], ['C', C.dim, ARABIC ? 'الأقل (٥٪)' : 'Low (5%)']].map(([cls, col, lbl]) => (
+            <div key={cls}>
+              <div style={{ fontWeight: 800, color: col, marginBottom: 4 }}>{cls} · {lbl} ({abcClass(cls).length})</div>
+              {abcClass(cls).slice(0, 8).map((x, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</span><span style={{ color: C.dim, marginInlineStart: 6 }}>{money(x.revenue)}</span></div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {!abc.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا بيانات مبيعات' : 'No sales data'}</div>}
       </div>
     </div>
   );
@@ -1076,16 +1272,16 @@ function Categories({ notify }) {
 function Users({ me, notify }) {
   const [users, setUsers] = useState([]);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ username: '', password: '', role: 'user', views: [] });
-  const VIEW_OPTS = ['inventory', 'history', 'reports'];
+  const [form, setForm] = useState({ username: '', password: '', role: 'user', views: [], full_name: '', wage: '' });
+  const VIEW_OPTS = ['inventory', 'receive', 'history', 'reports'];
   const load = useCallback(() => api.get('/users').then(setUsers).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
 
   const add = async () => {
     if (form.password.length < 8) { notify(ARABIC ? 'كلمة المرور 8 أحرف على الأقل' : 'Password 8+ chars', 'red'); return; }
     try {
-      await api.post('/users', { username: form.username, password: form.password, role: form.role, views: form.role === 'admin' ? [] : form.views });
-      setAdding(false); setForm({ username: '', password: '', role: 'user', views: [] }); load();
+      await api.post('/users', { username: form.username, password: form.password, role: form.role, views: form.role === 'admin' ? [] : form.views, full_name: form.full_name, wage: Number(form.wage) || 0 });
+      setAdding(false); setForm({ username: '', password: '', role: 'user', views: [], full_name: '', wage: '' }); load();
       notify(ARABIC ? 'تمت إضافة المستخدم' : 'User added', 'green');
     } catch (ex) { notify(ex.message === 'exists' ? (ARABIC ? 'اسم مستخدم مكرر' : 'Username taken') : (ARABIC ? 'فشل' : 'Failed'), 'red'); }
   };
@@ -1098,13 +1294,15 @@ function Users({ me, notify }) {
   return (
     <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 800 }}>{ARABIC ? 'المستخدمون' : 'Users'}</div>
-        <button onClick={() => setAdding((a) => !a)} style={S.btnGhost}>{adding ? (ARABIC ? 'إغلاق' : 'Close') : (ARABIC ? '+ مستخدم' : '+ User')}</button>
+        <div style={{ fontWeight: 800 }}>{ARABIC ? 'الموظفون' : 'Employees'}</div>
+        <button onClick={() => setAdding((a) => !a)} style={S.btnGhost}>{adding ? (ARABIC ? 'إغلاق' : 'Close') : (ARABIC ? '+ موظف' : '+ Employee')}</button>
       </div>
       {adding && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, background: C.panel2, borderRadius: 8 }}>
+          <input style={S.input} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder={ARABIC ? 'الاسم الكامل' : 'Full name'} />
           <input style={S.input} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} autoCapitalize="off" />
           <input style={S.input} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={ARABIC ? 'كلمة المرور (8+)' : 'Password (8+)'} />
+          <input style={S.input} type="number" step="0.01" value={form.wage} onChange={(e) => setForm({ ...form, wage: e.target.value })} placeholder={ARABIC ? 'أجر الساعة (اختياري)' : 'Hourly wage (optional)'} />
           <div style={{ display: 'flex', gap: 8 }}>
             {['user', 'admin'].map((r) => (
               <button key={r} onClick={() => setForm({ ...form, role: r })} style={{ ...S.btnGhost, flex: 1, ...(form.role === r ? { background: C.blue, color: '#fff', borderColor: C.blue } : {}) }}>{r}</button>
@@ -1124,8 +1322,8 @@ function Users({ me, notify }) {
         {users.map((u) => (
           <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
             <div style={{ flex: 1 }}>
-              <span style={{ fontWeight: 600 }}>{u.username}</span>
-              <span style={{ color: C.dim, fontSize: 12, marginInlineStart: 8 }}>{u.role}{u.role !== 'admin' && (u.allowed_views || []).length ? ' · ' + u.allowed_views.join(', ') : ''}</span>
+              <span style={{ fontWeight: 600 }}>{u.full_name || u.username}</span>
+              <span style={{ color: C.dim, fontSize: 12, marginInlineStart: 8 }}>{u.username} · {u.role}{u.role !== 'admin' && (u.allowed_views || []).length ? ' · ' + u.allowed_views.join(', ') : ''}{Number(u.wage) > 0 ? ' · ' + money(u.wage) + '/h' : ''}</span>
             </div>
             {u.id !== me.id && <button onClick={() => del(u)} style={{ ...S.btnGhost, padding: '5px 10px', color: C.red }}>{ARABIC ? 'حذف' : 'Del'}</button>}
           </div>

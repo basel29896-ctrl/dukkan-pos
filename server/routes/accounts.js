@@ -54,7 +54,7 @@ router.get('/users', requireSession, requireAdmin, async (req, res, next) => {
   try {
     // pass_hash / session_token are never exposed.
     const { rows } = await db.query(
-      'select id, username, email, role, allowed_views, active from app_users order by created_at'
+      'select id, username, email, role, allowed_views, active, full_name, wage from app_users order by created_at'
     );
     res.json(rows);
   } catch (e) { next(e); }
@@ -62,15 +62,15 @@ router.get('/users', requireSession, requireAdmin, async (req, res, next) => {
 
 router.post('/users', requireSession, requireAdmin, async (req, res, next) => {
   try {
-    const { username, password, role, views, email } = req.body || {};
+    const { username, password, role, views, email, full_name, wage } = req.body || {};
     if (!password || String(password).length < 8) return fail(res, 'too_short', 400);
     const dup = await db.query('select 1 from app_users where username = lower($1)', [String(username || '')]);
     if (dup.rows[0]) return fail(res, 'exists', 400);
     const hash = bcrypt.hashSync(String(password), 10);
     const { rows } = await db.query(
-      `insert into app_users (username, email, role, allowed_views, pass_hash)
-       values (lower($1), nullif($2,''), coalesce($3,'user'), coalesce($4::text[],'{}'), $5) returning id`,
-      [String(username || ''), email ?? '', role ?? null, views ?? null, hash]   // views: text[] (JS array) or null
+      `insert into app_users (username, email, role, allowed_views, pass_hash, full_name, wage)
+       values (lower($1), nullif($2,''), coalesce($3,'user'), coalesce($4::text[],'{}'), $5, $6, $7) returning id`,
+      [String(username || ''), email ?? '', role ?? null, views ?? null, hash, full_name ?? null, wage ?? 0]   // views: text[] (JS array) or null
     );
     res.json({ id: rows[0].id, ok: true });
   } catch (e) { dbError(res, next, e); }
@@ -78,7 +78,7 @@ router.post('/users', requireSession, requireAdmin, async (req, res, next) => {
 
 router.put('/users/:id', requireSession, requireAdmin, async (req, res, next) => {
   try {
-    const { role, views, active, email, username } = req.body || {};
+    const { role, views, active, email, username, full_name, wage } = req.body || {};
     if (username != null && String(username).trim().length > 0) {
       const dup = await db.query('select 1 from app_users where username = lower($1) and id <> $2',
         [String(username), req.params.id]);
@@ -90,9 +90,11 @@ router.put('/users/:id', requireSession, requireAdmin, async (req, res, next) =>
          role          = coalesce($2, role),
          allowed_views = coalesce($3, allowed_views),
          active        = coalesce($4, active),
-         email         = coalesce($5, email)
+         email         = coalesce($5, email),
+         full_name     = coalesce($7, full_name),
+         wage          = coalesce($8, wage)
        where id = $6`,
-      [username ?? null, role ?? null, views ?? null, active ?? null, email ?? null, req.params.id]
+      [username ?? null, role ?? null, views ?? null, active ?? null, email ?? null, req.params.id, full_name ?? null, wage ?? null]
     );
     res.json({ ok: true });
   } catch (e) { dbError(res, next, e); }

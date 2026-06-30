@@ -30,9 +30,11 @@ const seed = () => ({
   nextBatch: 3,
   orders: [],
   users: [
-    { id: 'u-admin', username: 'admin', role: 'admin', allowed_views: [], active: true },
-    { id: 'u-cashier', username: 'cashier', role: 'user', allowed_views: ['inventory', 'history'], active: true },
+    { id: 'u-admin', username: 'admin', role: 'admin', allowed_views: [], active: true, full_name: 'Store Owner', wage: 0 },
+    { id: 'u-cashier', username: 'cashier', role: 'user', allowed_views: ['inventory', 'history'], active: true, full_name: 'Cashier One', wage: 2.5 },
   ],
+  time_clock: [],
+  nextPunch: 1,
   categories: ['Drinks', 'Snacks', 'Dairy', 'Produce', 'Bakery', 'Household', 'Frozen', 'Other'],
   invoice: 0,
   nextId: 7,
@@ -156,6 +158,38 @@ async function handle(method, path, body) {
       return Object.values(m).sort((a, b) => b.units - a.units).slice(0, +query.limit || 20);
     }
     if (parts[1] === 'low-stock') { const t = +query.threshold || 5; return db.products.filter((p) => p.active && (+p.stock || 0) <= t).sort((a, b) => a.stock - b.stock); }
+    if (parts[1] === 'zreport') {
+      const day = query.date || new Date().toISOString().slice(0, 10);
+      const dayOf = (o) => (o.date || (o.created_at || '').slice(0, 10));
+      const m = {};
+      db.orders.filter((o) => dayOf(o) === day).forEach((o) => { const k = o.pay || '?'; (m[k] = m[k] || { pay: k, orders: 0, total: 0 }).orders++; m[k].total += +o.total || 0; });
+      const lines = Object.values(m);
+      return { date: day, lines, net: lines.reduce((s, r) => s + r.total, 0) };
+    }
+    if (parts[1] === 'abc') {
+      const m = {}; sales.forEach((o) => (o.items || []).forEach((l) => { m[l.name] = (m[l.name] || 0) + (+l.price || 0) * (+l.qty || 0); }));
+      const arr = Object.entries(m).map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue);
+      const grand = arr.reduce((s, r) => s + r.revenue, 0) || 1;
+      let cum = 0;
+      return arr.map((r) => { cum += r.revenue; const share = cum / grand; return { name: r.name, revenue: r.revenue, cum_share: share, class: share <= 0.8 ? 'A' : share <= 0.95 ? 'B' : 'C' }; });
+    }
+  }
+
+  // ── time clock ──
+  if (top === 'timeclock') {
+    if (parts[1] === 'status') return db.time_clock.find((t) => t.user_id === me.id && !t.clock_out) || null;
+    if (parts[1] === 'in') {
+      if (!db.time_clock.some((t) => t.user_id === me.id && !t.clock_out)) { db.time_clock.unshift({ id: db.nextPunch++, user_id: me.id, username: me.username, clock_in: new Date().toISOString(), clock_out: null }); save(db); }
+      return { ok: true };
+    }
+    if (parts[1] === 'out') {
+      const p = db.time_clock.find((t) => t.user_id === me.id && !t.clock_out);
+      if (!p) err('not_clocked_in', 400);
+      p.clock_out = new Date().toISOString(); save(db); return { ok: true };
+    }
+    if (method === 'GET') {
+      return db.time_clock.map((t) => ({ username: t.username, clock_in: t.clock_in, clock_out: t.clock_out, hours: Math.round(((t.clock_out ? new Date(t.clock_out) : new Date()) - new Date(t.clock_in)) / 36000) / 100 }));
+    }
   }
 
   // ── suppliers ──
@@ -196,13 +230,13 @@ async function handle(method, path, body) {
   // ── users (admin) ──
   if (top === 'users') {
     if (!isAdmin) err('not_admin', 403);
-    if (method === 'GET') return db.users.map((u) => ({ id: u.id, username: u.username, role: u.role, allowed_views: u.allowed_views, active: u.active }));
+    if (method === 'GET') return db.users.map((u) => ({ id: u.id, username: u.username, role: u.role, allowed_views: u.allowed_views, active: u.active, full_name: u.full_name || '', wage: u.wage || 0 }));
     if (method === 'POST') {
       if (db.users.some((u) => u.username === String(body.username).toLowerCase())) err('exists', 400);
-      const u = { id: 'u-' + Date.now(), username: String(body.username).toLowerCase(), role: body.role || 'user', allowed_views: body.views || [], active: true };
+      const u = { id: 'u-' + Date.now(), username: String(body.username).toLowerCase(), role: body.role || 'user', allowed_views: body.views || [], active: true, full_name: body.full_name || '', wage: +body.wage || 0 };
       db.users.push(u); save(db); return { id: u.id, ok: true };
     }
-    if (method === 'PUT') { const u = db.users.find((x) => x.id === parts[1]); if (u) Object.assign(u, body); save(db); return { ok: true }; }
+    if (method === 'PUT') { const u = db.users.find((x) => x.id === parts[1]); if (u) Object.assign(u, { role: body.role ?? u.role, allowed_views: body.views ?? u.allowed_views, active: body.active ?? u.active, full_name: body.full_name ?? u.full_name, wage: body.wage ?? u.wage }); save(db); return { ok: true }; }
     if (method === 'DELETE') { db.users = db.users.filter((x) => x.id !== parts[1]); save(db); return { ok: true }; }
   }
 

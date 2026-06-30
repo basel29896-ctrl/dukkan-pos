@@ -76,6 +76,46 @@ router.get('/reports/top-products', ...gate, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// GET /api/reports/zreport?date=YYYY-MM-DD → daily close-out: count + total per payment method.
+router.get('/reports/zreport', ...gate, async (req, res, next) => {
+  try {
+    const day = req.query.date || new Date().toISOString().slice(0, 10);
+    const { rows } = await db.query(
+      `select coalesce(pay,'?') as pay, count(*)::int as orders, coalesce(sum(total),0) as total
+         from orders_main
+        where created_at >= $1::date and created_at < ($1::date + 1)
+        group by pay order by pay`,
+      [day]
+    );
+    const net = rows.reduce((s, r) => s + Number(r.total), 0);
+    res.json({ date: day, lines: rows, net });
+  } catch (e) { next(e); }
+});
+
+// GET /api/reports/abc → Pareto class per product by revenue share (A<=80%, B<=95%, C rest).
+router.get('/reports/abc', ...gate, async (req, res, next) => {
+  try {
+    const { where, params } = range(req);
+    const { rows } = await db.query(
+      `select li->>'name' as name,
+              sum((li->>'qty')::numeric * (li->>'price')::numeric) as revenue
+         from orders_main o, jsonb_array_elements(coalesce(o.items,'[]'::jsonb)) li
+         ${where}
+         group by li->>'name' order by revenue desc`,
+      params
+    );
+    const grand = rows.reduce((s, r) => s + Number(r.revenue || 0), 0) || 1;
+    let cum = 0;
+    const out = rows.map((r) => {
+      cum += Number(r.revenue || 0);
+      const share = cum / grand;
+      const cls = share <= 0.8 ? 'A' : share <= 0.95 ? 'B' : 'C';
+      return { name: r.name, revenue: Number(r.revenue || 0), cum_share: share, class: cls };
+    });
+    res.json(out);
+  } catch (e) { next(e); }
+});
+
 // GET /api/reports/low-stock?threshold=5 → products at/under the threshold (restock list).
 router.get('/reports/low-stock', ...gate, async (req, res, next) => {
   try {
