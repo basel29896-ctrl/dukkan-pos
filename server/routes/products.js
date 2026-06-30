@@ -12,7 +12,7 @@ const { fail, dbError } = require('../validate');
 router.get('/products', requireSession, async (req, res, next) => {
   try {
     const { rows } = await db.query(
-      'select id, barcode, name, price, cat, cost, stock, active from products order by name'
+      'select id, barcode, name, price, cat, cost, stock, unit, active from products order by name'
     );
     res.json(rows);
   } catch (e) { next(e); }
@@ -26,7 +26,7 @@ router.get('/products/barcode/:code', requireSession, async (req, res, next) => 
     const code = String(req.params.code || '').trim();
     if (!code) return fail(res, 'invalid', 400);
     const { rows } = await db.query(
-      'select id, barcode, name, price, cat, cost, stock, active from products where barcode = $1',
+      'select id, barcode, name, price, cat, cost, stock, unit, active from products where barcode = $1',
       [code]
     );
     if (!rows[0]) return fail(res, 'not_found', 404);
@@ -44,10 +44,10 @@ router.post('/products', requireSession, async (req, res, next) => {
     if (!name) return fail(res, 'invalid', 400);
     const barcode = p.barcode != null && String(p.barcode).trim() !== '' ? String(p.barcode).trim() : null;
     const { rows } = await db.query(
-      `insert into products (barcode, name, price, cat, cost, stock)
-       values ($1,$2,$3,$4,$5,$6)
-       returning id, barcode, name, price, cat, cost, stock, active`,
-      [barcode, name, p.price ?? 0, p.cat ?? null, p.cost ?? 0, p.stock ?? 0]
+      `insert into products (barcode, name, price, cat, cost, stock, unit)
+       values ($1,$2,$3,$4,$5,$6,$7)
+       returning id, barcode, name, price, cat, cost, stock, unit, active`,
+      [barcode, name, p.price ?? 0, p.cat ?? null, p.cost ?? 0, p.stock ?? 0, p.unit === 'kg' ? 'kg' : 'ea']
     );
     res.json(rows[0]);
   } catch (e) { dbError(res, next, e); }
@@ -63,9 +63,9 @@ router.put('/products/:id', requireSession, async (req, res, next) => {
     await db.query(
       `update products set
          barcode = $1, name = $2, price = $3, cat = $4, cost = $5, stock = $6,
-         active = coalesce($7, active), updated_at = now()
-       where id = $8`,
-      [barcode, name, p.price ?? 0, p.cat ?? null, p.cost ?? 0, p.stock ?? 0, p.active ?? null, req.params.id]
+         unit = $7, active = coalesce($8, active), updated_at = now()
+       where id = $9`,
+      [barcode, name, p.price ?? 0, p.cat ?? null, p.cost ?? 0, p.stock ?? 0, p.unit === 'kg' ? 'kg' : 'ea', p.active ?? null, req.params.id]
     );
     res.json({ ok: true });
   } catch (e) { dbError(res, next, e); }

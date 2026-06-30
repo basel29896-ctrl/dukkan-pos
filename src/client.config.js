@@ -32,10 +32,11 @@ export const BILL = CLIENT.bill;
 export const SELLER = CLIENT.bill.seller;
 
 // Nav views available in this build. `reports` is server-enforced (allowed_views).
-export const VIEWS = ["sales", "inventory", "history", "reports", "settings"];
+export const VIEWS = ["sales", "inventory", "receive", "history", "reports", "settings"];
 export const VIEW_LABELS = {
   sales: ARABIC ? "البيع" : "Sales",
   inventory: ARABIC ? "المخزون" : "Inventory",
+  receive: ARABIC ? "استلام" : "Receive",
   history: ARABIC ? "السجل" : "History",
   reports: ARABIC ? "التقارير" : "Reports",
   settings: ARABIC ? "الإعدادات" : "Settings",

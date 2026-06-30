@@ -7,16 +7,27 @@
 // Demo logins (any password):  admin / admin   ·   cashier / cashier
 const LS_KEY = 'dukkan_demo_db';
 const DEMO_BANNER = true;
+const isoIn = (days) => { const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
 
 const seed = () => ({
   products: [
-    { id: 1, barcode: '6281000011002', name: 'Laban 1L', price: 1.250, cat: 'Dairy', cost: 0.9, stock: 24, active: true },
-    { id: 2, barcode: '6281000022003', name: 'Pita Bread', price: 0.400, cat: 'Bakery', cost: 0.25, stock: 60, active: true },
-    { id: 3, barcode: '5449000000996', name: 'Cola 330ml', price: 0.500, cat: 'Drinks', cost: 0.3, stock: 4, active: true },
-    { id: 4, barcode: '6281000033004', name: 'Potato Chips', price: 0.750, cat: 'Snacks', cost: 0.45, stock: 18, active: true },
-    { id: 5, barcode: '6281000044005', name: 'Tomatoes 1kg', price: 0.900, cat: 'Produce', cost: 0.6, stock: 12, active: true },
-    { id: 6, barcode: '6281000055006', name: 'Dish Soap', price: 1.100, cat: 'Household', cost: 0.7, stock: 9, active: true },
+    { id: 1, barcode: '6281000011002', name: 'Laban 1L', price: 1.250, cat: 'Dairy', cost: 0.9, stock: 24, unit: 'ea', active: true },
+    { id: 2, barcode: '6281000022003', name: 'Pita Bread', price: 0.400, cat: 'Bakery', cost: 0.25, stock: 60, unit: 'ea', active: true },
+    { id: 3, barcode: '5449000000996', name: 'Cola 330ml', price: 0.500, cat: 'Drinks', cost: 0.3, stock: 4, unit: 'ea', active: true },
+    { id: 4, barcode: '6281000033004', name: 'Potato Chips', price: 0.750, cat: 'Snacks', cost: 0.45, stock: 18, unit: 'ea', active: true },
+    { id: 5, barcode: '6281000044005', name: 'Tomatoes (per kg)', price: 0.900, cat: 'Produce', cost: 0.6, stock: 30, unit: 'kg', active: true },
+    { id: 6, barcode: '6281000055006', name: 'Dish Soap', price: 1.100, cat: 'Household', cost: 0.7, stock: 9, unit: 'ea', active: true },
   ],
+  suppliers: [
+    { id: 1, name: 'Amman Dairy Co.', phone: '06-555-1234', note: '', active: true },
+    { id: 2, name: 'Fresh Farms', phone: '079-555-9876', note: '', active: true },
+  ],
+  batches: [
+    { id: 1, product_id: 1, supplier_id: 1, qty: 24, cost: 0.9, expiry: isoIn(6), received_at: new Date().toISOString() },
+    { id: 2, product_id: 5, supplier_id: 2, qty: 30, cost: 0.6, expiry: isoIn(2), received_at: new Date().toISOString() },
+  ],
+  nextSupplier: 3,
+  nextBatch: 3,
   orders: [],
   users: [
     { id: 'u-admin', username: 'admin', role: 'admin', allowed_views: [], active: true },
@@ -28,7 +39,16 @@ const seed = () => ({
 });
 
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(LS_KEY)); if (d && d.products) return d; } catch (_) {}
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_KEY));
+    if (d && d.products) {
+      // Backfill keys added in later versions so older saved demo DBs keep working.
+      const s = seed();
+      for (const k of Object.keys(s)) if (d[k] === undefined) d[k] = s[k];
+      d.products.forEach((p) => { if (p.unit === undefined) p.unit = 'ea'; });
+      return d;
+    }
+  } catch (_) {}
   const s = seed(); save(s); return s;
 }
 function save(db) { localStorage.setItem(LS_KEY, JSON.stringify(db)); }
@@ -82,12 +102,12 @@ async function handle(method, path, body) {
     if (method === 'GET') return db.products.slice().sort((a, b) => a.name.localeCompare(b.name));
     if (method === 'POST') {
       if (body.barcode && db.products.some((x) => x.barcode === body.barcode)) err('exists', 409);
-      const p = { id: db.nextId++, barcode: body.barcode || null, name: body.name, price: +body.price || 0, cat: body.cat || null, cost: +body.cost || 0, stock: +body.stock || 0, active: true };
+      const p = { id: db.nextId++, barcode: body.barcode || null, name: body.name, price: +body.price || 0, cat: body.cat || null, cost: +body.cost || 0, stock: +body.stock || 0, unit: body.unit === 'kg' ? 'kg' : 'ea', active: true };
       db.products.push(p); save(db); return p;
     }
     if (method === 'PUT') {
       const p = db.products.find((x) => String(x.id) === parts[1]);
-      if (p) Object.assign(p, { barcode: body.barcode || null, name: body.name, price: +body.price || 0, cat: body.cat || null, cost: +body.cost || 0, stock: +body.stock || 0 });
+      if (p) Object.assign(p, { barcode: body.barcode || null, name: body.name, price: +body.price || 0, cat: body.cat || null, cost: +body.cost || 0, stock: +body.stock || 0, unit: body.unit === 'kg' ? 'kg' : 'ea' });
       save(db); return { ok: true };
     }
     if (method === 'PATCH' && parts[2] === 'stock') {
@@ -136,6 +156,41 @@ async function handle(method, path, body) {
       return Object.values(m).sort((a, b) => b.units - a.units).slice(0, +query.limit || 20);
     }
     if (parts[1] === 'low-stock') { const t = +query.threshold || 5; return db.products.filter((p) => p.active && (+p.stock || 0) <= t).sort((a, b) => a.stock - b.stock); }
+  }
+
+  // ── suppliers ──
+  if (top === 'suppliers') {
+    if (method === 'GET') return db.suppliers.filter((s) => s.active);
+    if (method === 'POST') { const s = { id: db.nextSupplier++, name: body.name, phone: body.phone || null, note: body.note || null, active: true }; db.suppliers.push(s); save(db); return s; }
+    if (method === 'PUT') { const s = db.suppliers.find((x) => String(x.id) === parts[1]); if (s) Object.assign(s, { name: body.name, phone: body.phone || null, note: body.note || null }); save(db); return { ok: true }; }
+    if (method === 'DELETE') { const s = db.suppliers.find((x) => String(x.id) === parts[1]); if (s) s.active = false; save(db); return { ok: true }; }
+  }
+
+  // ── batches (receive stock) ──
+  if (top === 'batches') {
+    if (method === 'POST') {
+      const qty = +body.qty || 0;
+      const b = { id: db.nextBatch++, product_id: +body.product_id, supplier_id: body.supplier_id ? +body.supplier_id : null, qty, cost: +body.cost || 0, expiry: body.expiry || null, received_at: new Date().toISOString() };
+      db.batches.unshift(b);
+      const p = db.products.find((x) => x.id === b.product_id); if (p) p.stock = (+p.stock || 0) + qty;
+      save(db); return { ok: true, stock: p ? p.stock : null };
+    }
+    if (method === 'GET') {
+      const pid = query.product_id ? +query.product_id : null;
+      return db.batches.filter((b) => !pid || b.product_id === pid).map((b) => ({
+        ...b, product: (db.products.find((p) => p.id === b.product_id) || {}).name,
+        supplier: (db.suppliers.find((s) => s.id === b.supplier_id) || {}).name,
+      }));
+    }
+  }
+
+  if (top === 'expiry') {
+    const days = +query.days || 30;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return db.batches.filter((b) => b.expiry).map((b) => {
+      const left = Math.round((new Date(b.expiry) - today) / 86400000);
+      return { id: b.id, product_id: b.product_id, product: (db.products.find((p) => p.id === b.product_id) || {}).name, supplier: (db.suppliers.find((s) => s.id === b.supplier_id) || {}).name, qty: b.qty, expiry: b.expiry, days_left: left };
+    }).filter((x) => x.days_left <= days).sort((a, b) => a.days_left - b.days_left);
   }
 
   // ── users (admin) ──
