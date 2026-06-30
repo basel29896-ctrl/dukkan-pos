@@ -202,6 +202,11 @@ function Login({ onLogin }) {
         <input style={S.input} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} value={username} onChange={(e) => setUsername(e.target.value)} autoFocus autoCapitalize="off" />
         <input style={S.input} type="password" placeholder={ARABIC ? 'كلمة المرور' : 'Password'} value={password} onChange={(e) => setPassword(e.target.value)} />
         {err && <div style={{ color: C.red, fontSize: 13 }}>{err}</div>}
+        {process.env.REACT_APP_DEMO === '1' && (
+          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, fontSize: 12, color: C.dim, textAlign: 'center' }}>
+            DEMO — no backend. Sign in: <b style={{ color: C.accent }}>admin</b> / any password<br />or <b style={{ color: C.accent }}>cashier</b> (limited views). Data is local to your browser.
+          </div>
+        )}
         <button type="submit" disabled={busy} style={{ ...S.btn, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : (ARABIC ? 'دخول' : 'Login')}</button>
       </form>
     </div>

@@ -46,7 +46,7 @@ async function req(method, path, body) {
   return data;
 }
 
-export const api = {
+const realApi = {
   get: (p) => req('GET', p),
   post: (p, b) => req('POST', p, b),
   put: (p, b) => req('PUT', p, b),
@@ -57,4 +57,10 @@ export const api = {
   setOnSessionExpired,
 };
 
+// DEMO build (GitHub Pages, no backend): swap in the in-browser mock API. Flag is set
+// only for the Pages build (REACT_APP_DEMO=1); the real Heroku build keeps realApi.
+// eslint-disable-next-line
+const api = process.env.REACT_APP_DEMO === '1' ? require('./demoApi').default : realApi;
+
+export { api };
 export default api;
