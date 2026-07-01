@@ -470,6 +470,7 @@ function SalesView({ user, notify }) {
   const [held, setHeld] = useState(() => { try { return JSON.parse(localStorage.getItem(HELD_KEY)) || []; } catch (_) { return []; } });
   const [showHeld, setShowHeld] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);   // {name, price, qty} → green flash in bill
+  const [receipt, setReceipt] = useState(null);       // completed sale → print-or-skip popup
   const [showPad, setShowPad] = useState(() => localStorage.getItem(PAD_KEY) === '1');   // cash keypad, hidden by default
   const scanRef = useRef(null);
   const flashTimer = useRef(null);
@@ -528,7 +529,7 @@ function SalesView({ user, notify }) {
   const onScanRef = useRef(null);
   onScanRef.current = onScan;
   const modalOpenRef = useRef(false);
-  modalOpenRef.current = !!(newProduct || editLine || quickItem || weighItem || showHeld);
+  modalOpenRef.current = !!(newProduct || editLine || quickItem || weighItem || showHeld || receipt);
   useEffect(() => {
     let buf = '';
     let lastTs = 0;
@@ -621,7 +622,8 @@ function SalesView({ user, notify }) {
     setBusy(true);
     const { date, time } = nowParts();
     const sale = { id: uid(), floor: DEFAULT_FLOOR, items: cart, sub: total, tax: 0, svc: 0, disc: 0, total, pay, waiter: user.username, status: 'paid', date, time };
-    const finish = (s) => { printReceipt(s); setCart([]); setTendered(''); setPay('cash'); scanRef.current && scanRef.current.focus(); };
+    // Sale is committed at this point — the popup only decides whether to print.
+    const finish = (s) => { setReceipt({ ...s, change }); setCart([]); setTendered(''); setPay('cash'); };
     try {
       let invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
       try {
@@ -859,7 +861,47 @@ function SalesView({ user, notify }) {
           onClose={() => { setWeighItem(null); refocus(); }}
           onAdd={(kg) => { addToCart(weighItem, kg); setWeighItem(null); refocus(); }} />
       )}
+      {receipt && <ReceiptModal sale={receipt} onClose={() => { setReceipt(null); refocus(); }} />}
     </div>
+  );
+}
+
+// Post-payment popup: bill summary + "Print" or paperless "Done". The sale is already
+// saved — this only decides whether paper comes out.
+function ReceiptModal({ sale, onClose }) {
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ ...S.card, width: 380, display: 'flex', flexDirection: 'column', gap: 0, padding: 0, overflow: 'hidden' }}>
+        <div style={{ background: `linear-gradient(135deg, ${C.green}, #2aa872)`, color: '#0f1117', padding: '16px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 34, lineHeight: 1 }}>✓</div>
+          <div style={{ fontWeight: 800, fontSize: 19, marginTop: 4 }}>{ARABIC ? 'تم الدفع' : 'Payment complete'}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.75 }}>{ARABIC ? 'فاتورة' : 'Invoice'} #{sale.invoice_no} · {sale.date} {String(sale.time).slice(0, 5)}</div>
+        </div>
+        <div style={{ padding: '14px 20px', maxHeight: '38vh', overflow: 'auto' }}>
+          {(sale.items || []).map((l, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 0', borderBottom: `1px dashed ${C.line}`, fontSize: 14 }}>
+              <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name} <span style={{ color: C.dim }}>× {l.qty}</span></span>
+              <span style={{ flexShrink: 0, fontWeight: 700 }}>{money(l.price * l.qty)}</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, fontWeight: 800, fontSize: 19 }}>
+            <span>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ color: C.accent }}>{money(sale.total)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 4, fontSize: 14, color: C.dim }}>
+            <span>{sale.pay === 'cash' ? (ARABIC ? '💵 نقدي' : '💵 Cash') : (ARABIC ? '💳 بطاقة' : '💳 Card')}</span>
+            {sale.change != null && sale.change >= 0 && <span style={{ color: C.green, fontWeight: 800 }}>{ARABIC ? 'الباقي' : 'Change'}: {money(sale.change)}</span>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, padding: '0 20px 18px' }}>
+          <button onClick={() => { printReceipt(sale); onClose(); }} style={{ ...S.btnGhost, flex: 1, padding: '16px', fontSize: 16, fontWeight: 800 }}>
+            🖨 {ARABIC ? 'طباعة' : 'Print'}
+          </button>
+          <button onClick={onClose} autoFocus style={{ ...S.btn, flex: 1.4, padding: '16px', fontSize: 16, background: C.green }}>
+            🌿 {ARABIC ? 'تم — بدون طباعة' : 'Done — no paper'}
+          </button>
+        </div>
+      </div>
+    </Overlay>
   );
 }
 
