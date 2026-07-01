@@ -140,9 +140,8 @@ export default function App() {
   const navViews = VIEWS.filter(allowed);
 
   return (
-    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', flexDirection: 'column' }}>
-      <Header user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout} canSeeStock={allowed('inventory') || allowed('reports')} />
-      <main style={{ flex: 1, padding: 16, maxWidth: 1180, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+    <div dir="ltr" style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', alignItems: 'stretch' }}>
+      <main dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, padding: 16, boxSizing: 'border-box' }}>
         {view === 'sales' && <SalesView user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <InventoryView isAdmin={isAdmin} notify={notify} />}
         {view === 'receive' && allowed('receive') && <ReceiveView isAdmin={isAdmin} notify={notify} />}
@@ -150,6 +149,7 @@ export default function App() {
         {view === 'reports' && allowed('reports') && <ReportsView notify={notify} />}
         {view === 'settings' && <SettingsView user={user} isAdmin={isAdmin} notify={notify} />}
       </main>
+      <Sidebar user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout} canSeeStock={allowed('inventory') || allowed('reports')} />
       {toast && (
         <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: toast.kind === 'red' ? C.red : toast.kind === 'green' ? C.green : C.panel2, color: toast.kind === 'info' ? C.text : C.accentText, padding: '11px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, boxShadow: '0 6px 24px rgba(0,0,0,.4)', zIndex: 1000 }}>
           {toast.msg}
@@ -249,34 +249,43 @@ function NotificationsBell() {
   );
 }
 
-function Header({ user, view, setView, navViews, onLogout, canSeeStock }) {
+// Vertical navigation rail, pinned to the right edge. Bigger touch targets.
+function Sidebar({ user, view, setView, navViews, onLogout, canSeeStock }) {
   return (
-    <header style={{ background: C.panel, borderBottom: `1px solid ${C.line}`, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <div style={{ fontWeight: 800, fontSize: 22, color: C.accent }}>{STORE_NAME}</div>
-      <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+    <aside dir={ARABIC ? 'rtl' : 'ltr'} style={{
+      width: 220, flex: '0 0 220px', background: C.panel, borderInlineStart: `1px solid ${C.line}`,
+      display: 'flex', flexDirection: 'column', gap: 10, padding: 14, boxSizing: 'border-box',
+      position: 'sticky', top: 0, height: '100vh', overflowY: 'auto',
+    }}>
+      <div style={{ fontWeight: 800, fontSize: 26, color: C.accent, textAlign: 'center', padding: '6px 0 10px' }}>{STORE_NAME}</div>
+
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {navViews.map((v) => {
           const on = view === v;
           return (
             <button key={v} onClick={() => setView(v)}
               style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-                minWidth: 96, height: 64, padding: '6px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 12,
+                width: '100%', height: 72, padding: '0 18px', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit',
                 border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : C.panel2,
-                color: on ? C.accentText : C.text, fontWeight: 700, fontSize: 15, transition: 'background .12s',
+                color: on ? C.accentText : C.text, fontWeight: 700, fontSize: 18, transition: 'background .12s',
               }}>
-              <span style={{ fontSize: 24, lineHeight: 1 }}>{VIEW_ICONS[v]}</span>
+              <span style={{ fontSize: 30, lineHeight: 1 }}>{VIEW_ICONS[v]}</span>
               <span>{VIEW_LABELS[v]}</span>
             </button>
           );
         })}
       </nav>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+
+      <div style={{ flex: 1 }} />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
         {canSeeStock && <NotificationsBell />}
         <ClockButton />
-        <span style={{ fontSize: 13, color: C.dim }}>{user.full_name || user.username}</span>
-        <button onClick={onLogout} style={{ ...S.btnGhost, height: 64, minWidth: 90, fontSize: 15 }}>{ARABIC ? 'خروج' : 'Logout'}</button>
+        <div style={{ fontSize: 14, color: C.dim, textAlign: 'center' }}>{user.full_name || user.username}</div>
+        <button onClick={onLogout} style={{ ...S.btnGhost, height: 56, fontSize: 16 }}>{ARABIC ? '🚪 خروج' : '🚪 Logout'}</button>
       </div>
-    </header>
+    </aside>
   );
 }
 
@@ -518,9 +527,9 @@ function SalesView({ user, notify }) {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 16, alignItems: 'start' }}>
+    <div dir="ltr" style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
       {/* Left: scan + tap-to-add product tiles */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', gap: 10 }}>
           <input ref={scanRef} style={{ ...S.input, fontSize: 18, padding: '14px', letterSpacing: 1 }}
             value={scan} onChange={(e) => setScan(e.target.value)}
@@ -547,10 +556,10 @@ function SalesView({ user, notify }) {
 
         <input style={S.input} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={ARABIC ? 'ابحث بالاسم أو الباركود…' : 'Search by name or barcode…'} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, alignContent: 'start' }}>
           {tiles.map((p) => (
             <button key={p.id} onClick={() => addProduct(p)} style={{
-              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 6, minHeight: 86, padding: 12,
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 6, height: 112, padding: 12,
               borderRadius: 12, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, cursor: 'pointer',
               textAlign: 'start', fontFamily: 'inherit',
             }}>
@@ -566,7 +575,7 @@ function SalesView({ user, notify }) {
       </div>
 
       {/* Right: bill */}
-      <div style={{ ...S.card, position: 'sticky', top: 16, padding: 18 }}>
+      <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, flex: '0 0 400px', width: 400, position: 'sticky', top: 16, padding: 18 }}>
         <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 10 }}>🧾 {ARABIC ? 'الفاتورة' : 'Bill'}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '42vh', overflow: 'auto' }}>
           {!cart.length && <div style={{ color: C.dim, fontSize: 15, padding: '28px 0', textAlign: 'center' }}>{ARABIC ? 'اضغط أو امسح منتجاً للبدء' : 'Tap or scan a product to start'}</div>}
