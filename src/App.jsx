@@ -446,6 +446,7 @@ function Login({ onLogin }) {
 // ══════════════════════════════════════════════════════════════════════════════
 const HELD_KEY = 'dukkan_held_sales';
 const PENDING_KEY = 'dukkan_pending_sales';   // sales made offline, awaiting sync
+const PAD_KEY = 'dukkan_show_cash_pad';       // cash keypad visibility preference
 
 const readPending = () => { try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; } catch (_) { return []; } };
 // Network failure = fetch rejected before a response (our api errors always carry .status).
@@ -466,6 +467,7 @@ function SalesView({ user, notify }) {
   const [held, setHeld] = useState(() => { try { return JSON.parse(localStorage.getItem(HELD_KEY)) || []; } catch (_) { return []; } });
   const [showHeld, setShowHeld] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);   // {name, price, qty} → green flash in bill
+  const [showPad, setShowPad] = useState(() => localStorage.getItem(PAD_KEY) === '1');   // cash keypad, hidden by default
   const scanRef = useRef(null);
   const flashTimer = useRef(null);
   const flash = useCallback((line) => {
@@ -781,14 +783,20 @@ function SalesView({ user, notify }) {
                 <button key={d} onClick={() => setTendered(String(d))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 700 }}>{d}</button>
               ))}
             </div>
-            {/* Touch keypad — typed input pops no keyboard on a POS screen */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8 }}>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0'].map((d) => (
-                <button key={d} onClick={() => setTendered((v) => (d === '.' && v.includes('.') ? v : v + d))}
-                  style={{ ...S.btnGhost, padding: '13px 0', fontSize: 18, fontWeight: 800 }}>{d}</button>
-              ))}
-              <button onClick={() => setTendered((v) => v.slice(0, -1))} style={{ ...S.btnGhost, padding: '13px 0', fontSize: 18, color: C.red }}>⌫</button>
-            </div>
+            {/* Touch keypad — optional; collapsed by default (suggestion buttons cover most cases) */}
+            <button onClick={() => { const v = !showPad; setShowPad(v); localStorage.setItem(PAD_KEY, v ? '1' : '0'); }}
+              style={{ ...S.btnGhost, width: '100%', padding: '9px', marginTop: 8, fontSize: 13, color: C.dim }}>
+              {showPad ? (ARABIC ? '▲ إخفاء لوحة الأرقام' : '▲ Hide keypad') : (ARABIC ? '▼ إظهار لوحة الأرقام' : '▼ Show keypad')}
+            </button>
+            {showPad && (
+              <div className="rise" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8 }}>
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0'].map((d) => (
+                  <button key={d} onClick={() => setTendered((v) => (d === '.' && v.includes('.') ? v : v + d))}
+                    style={{ ...S.btnGhost, padding: '13px 0', fontSize: 18, fontWeight: 800 }}>{d}</button>
+                ))}
+                <button onClick={() => setTendered((v) => v.slice(0, -1))} style={{ ...S.btnGhost, padding: '13px 0', fontSize: 18, color: C.red }}>⌫</button>
+              </div>
+            )}
             {change != null && change >= 0 && (
               <div style={{ background: 'rgba(62,207,142,.12)', border: `1px solid ${C.green}`, borderRadius: 10, padding: '10px 14px', marginTop: 8, display: 'flex', justifyContent: 'space-between', color: C.green, fontSize: 19, fontWeight: 800 }}>
                 <span>{ARABIC ? 'الباقي' : 'Change'}</span><span>{money(change)}</span>
