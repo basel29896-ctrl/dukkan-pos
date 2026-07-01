@@ -109,7 +109,13 @@ async function handle(method, path, body) {
     }
     if (method === 'PUT') {
       const p = db.products.find((x) => String(x.id) === parts[1]);
-      if (p) Object.assign(p, { barcode: body.barcode || null, name: body.name, price: +body.price || 0, cat: body.cat || null, cost: +body.cost || 0, stock: +body.stock || 0, unit: body.unit === 'kg' ? 'kg' : 'ea' });
+      if (!p) err('not_found', 404);
+      // Mirrors the server rule: price/cost/barcode changes are admin-only.
+      if (!isAdmin) {
+        const changed = (+body.price || 0) !== (+p.price || 0) || (+body.cost || 0) !== (+p.cost || 0) || (body.barcode || null) !== (p.barcode || null);
+        if (changed) err('admin_only', 403);
+      }
+      Object.assign(p, { barcode: body.barcode || null, name: body.name, price: +body.price || 0, cat: body.cat || null, cost: +body.cost || 0, stock: +body.stock || 0, unit: body.unit === 'kg' ? 'kg' : 'ea' });
       save(db); return { ok: true };
     }
     if (method === 'PATCH' && parts[2] === 'stock') {
@@ -130,7 +136,23 @@ async function handle(method, path, body) {
   // ── invoice + orders ──
   if (top === 'invoice' && parts[1] === 'next') { db.invoice += 1; save(db); return db.invoice; }
   if (top === 'orders') {
-    if (method === 'POST') { db.orders.unshift({ ...body, created_at: new Date().toISOString() }); save(db); return { ok: true }; }
+    if (method === 'POST') {
+      const isRefund = body.status === 'refund';
+      // Mirrors server: over-refund guard against the original invoice.
+      if (isRefund && /^return of #(\d+)$/.test(String(body.buyer || ''))) {
+        const inv = Number(String(body.buyer).match(/#(\d+)$/)[1]);
+        const orig = db.orders.filter((o) => o.invoice_no === inv && o.status !== 'refund').reduce((s, o) => s + (+o.total || 0), 0);
+        const prior = db.orders.filter((o) => o.status === 'refund' && o.buyer === body.buyer).reduce((s, o) => s + (+o.total || 0), 0);
+        if (Math.abs(+body.total || 0) > orig + prior + 0.0005) err('over_refund', 400);
+      }
+      // Mirrors server: stock moves with the order (sale deducts, refund restores).
+      (body.items || []).forEach((li) => {
+        const p = db.products.find((x) => x.id === li.id);
+        if (p && Number.isFinite(+li.qty)) p.stock = (+p.stock || 0) + (isRefund ? +li.qty : -li.qty);
+      });
+      db.orders.unshift({ ...body, created_at: new Date().toISOString() });
+      save(db); return { ok: true };
+    }
     if (method === 'GET') { const lim = +query.limit || 200; return db.orders.slice(0, lim); }
     if (method === 'DELETE') { db.orders = db.orders.filter((o) => o.id !== parts[1]); save(db); return { ok: true }; }
   }

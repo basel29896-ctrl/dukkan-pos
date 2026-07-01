@@ -54,12 +54,25 @@ router.post('/products', requireSession, async (req, res, next) => {
 });
 
 // PUT /api/products/:id (update) — full row edit. stock is ABSOLUTE (never incremented here).
+// Price/cost/barcode changes are ADMIN-ONLY: a cashier session may fix names, categories and
+// stock counts, but cannot silently reprice the catalogue (shrinkage vector).
 router.put('/products/:id', requireSession, async (req, res, next) => {
   try {
     const p = req.body || {};
     const name = String(p.name || '').trim();
     if (!name) return fail(res, 'invalid', 400);
     const barcode = p.barcode != null && String(p.barcode).trim() !== '' ? String(p.barcode).trim() : null;
+
+    if (req.user.role !== 'admin') {
+      const { rows } = await db.query('select price, cost, barcode from products where id = $1', [req.params.id]);
+      if (!rows[0]) return fail(res, 'not_found', 404);
+      const cur = rows[0];
+      const changed =
+        Number(p.price ?? 0) !== Number(cur.price ?? 0) ||
+        Number(p.cost ?? 0) !== Number(cur.cost ?? 0) ||
+        (barcode ?? null) !== (cur.barcode ?? null);
+      if (changed) return fail(res, 'admin_only', 403);
+    }
     await db.query(
       `update products set
          barcode = $1, name = $2, price = $3, cat = $4, cost = $5, stock = $6,

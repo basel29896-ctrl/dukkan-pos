@@ -585,10 +585,8 @@ function SalesView({ user, notify }) {
       const invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
       const { date, time } = nowParts();
       const sale = { id: uid(), floor: DEFAULT_FLOOR, items: cart, sub: total, tax: 0, svc: 0, disc: 0, total, pay, waiter: user.username, status: 'paid', date, time, invoice_no };
+      // Server commits the order + stock deduction + stock log in ONE transaction.
       await api.post('/orders', sale);
-      // Only deduct stock for real catalogue products (numeric id); custom/open-price lines have string ids.
-      await Promise.all(cart.filter((l) => typeof l.id === 'number').map((l) => api.patch('/products/' + l.id + '/stock', { delta: -l.qty }).catch(() => {})));
-      api.post('/stock-log', { kind: 'sale', changed_by: user.username, name: `invoice ${invoice_no}`, new_qty: cart.length }).catch(() => {});
       printReceipt(sale);
       setCart([]); setTendered(''); setPay('cash');
       loadProducts();
@@ -926,7 +924,9 @@ function ProductModal({ initial, onClose, onSaved, notify, editing }) {
         onSaved(p);
       }
     } catch (ex) {
-      notify(ex.message === 'exists' ? (ARABIC ? 'باركود مكرر' : 'Barcode already exists') : (ARABIC ? 'فشل الحفظ' : 'Save failed'), 'red');
+      notify(ex.message === 'exists' ? (ARABIC ? 'باركود مكرر' : 'Barcode already exists')
+        : ex.message === 'admin_only' ? (ARABIC ? 'تعديل السعر يتطلب صلاحية مدير' : 'Price changes need an admin')
+        : (ARABIC ? 'فشل الحفظ' : 'Save failed'), 'red');
     } finally { setBusy(false); }
   };
 
@@ -1152,11 +1152,31 @@ function HistoryView({ user, notify }) {
       const invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
       const { date, time } = nowParts();
       const r = { id: uid(), floor: DEFAULT_FLOOR, items, sub: -refundTotal, tax: 0, svc: 0, disc: 0, total: -refundTotal, pay: 'refund', waiter: user.username, status: 'refund', date, time, invoice_no, buyer: 'return of #' + sale.invoice_no };
+      // Server restores stock + validates the refund cap in the same transaction.
       await api.post('/orders', r);
-      await Promise.all(items.map((l) => typeof l.id === 'number' && api.patch('/products/' + l.id + '/stock', { delta: +l.qty }).catch(() => {})));
       notify(ARABIC ? 'تم الاسترجاع' : 'Returned', 'green');
       setReturning(null); load();
-    } catch (ex) { notify(ARABIC ? 'فشل الاسترجاع' : 'Return failed', 'red'); } finally { setBusyId(null); }
+    } catch (ex) {
+      notify(ex.message === 'over_refund'
+        ? (ARABIC ? 'تجاوز مبلغ الاسترجاع قيمة الفاتورة' : 'Refund exceeds what remains of this sale')
+        : (ARABIC ? 'فشل الاسترجاع' : 'Return failed'), 'red');
+    } finally { setBusyId(null); }
+  };
+
+  // Per-invoice map of already-returned quantities (keyed by line id, name as fallback),
+  // built from the refund rows referencing 'return of #N'. Drives the remaining-qty clamp.
+  const returnedFor = (sale) => {
+    const map = {};
+    sales.filter((o) => o.status === 'refund' && o.buyer === 'return of #' + sale.invoice_no)
+      .forEach((o) => (o.items || []).forEach((l) => {
+        const k = l.id != null ? String(l.id) : l.name;
+        map[k] = (map[k] || 0) + (Number(l.qty) || 0);
+      }));
+    return map;
+  };
+  const fullyReturned = (sale) => {
+    const map = returnedFor(sale);
+    return (sale.items || []).every((l) => (map[l.id != null ? String(l.id) : l.name] || 0) >= (Number(l.qty) || 0));
   };
 
   if (loading) return <div style={{ color: C.dim }}>{ARABIC ? 'جارٍ التحميل…' : 'Loading…'}</div>;
@@ -1179,7 +1199,8 @@ function HistoryView({ user, notify }) {
                 <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isRefund ? C.red : C.text }}>{money(s.total)}</td>
                 <td style={{ ...td, textAlign: 'end', whiteSpace: 'nowrap' }}>
                   <button onClick={() => printReceipt(s)} style={{ ...S.btnGhost, padding: '6px 12px' }}>{ARABIC ? 'طباعة' : 'Print'}</button>
-                  {!isRefund && <button onClick={() => setReturning(s)} disabled={busyId === s.id} style={{ ...S.btnGhost, padding: '6px 12px', color: C.red, marginInlineStart: 6 }}>{busyId === s.id ? '…' : (ARABIC ? 'استرجاع' : 'Return')}</button>}
+                  {!isRefund && !fullyReturned(s) && <button onClick={() => setReturning(s)} disabled={busyId === s.id} style={{ ...S.btnGhost, padding: '6px 12px', color: C.red, marginInlineStart: 6 }}>{busyId === s.id ? '…' : (ARABIC ? 'استرجاع' : 'Return')}</button>}
+                  {!isRefund && fullyReturned(s) && <span style={{ color: C.dim, fontSize: 12, marginInlineStart: 6 }}>{ARABIC ? 'مسترجعة' : 'returned'}</span>}
                 </td>
               </tr>
             );
@@ -1187,24 +1208,27 @@ function HistoryView({ user, notify }) {
           {!sales.length && <tr><td colSpan={6} style={{ ...td, color: C.dim, textAlign: 'center', padding: 24 }}>{ARABIC ? 'لا مبيعات بعد' : 'No sales yet'}</td></tr>}
         </tbody>
       </table>
-      {returning && <ReturnModal sale={returning} busy={busyId === returning.id} onClose={() => setReturning(null)} onConfirm={(lines) => doReturn(returning, lines)} />}
+      {returning && <ReturnModal sale={returning} returned={returnedFor(returning)} busy={busyId === returning.id} onClose={() => setReturning(null)} onConfirm={(lines) => doReturn(returning, lines)} />}
     </div>
   );
 }
 
-// Pick how many of each line to return (defaults to full quantity).
-function ReturnModal({ sale, onClose, onConfirm, busy }) {
-  const [qty, setQty] = useState(() => (sale.items || []).map((l) => Number(l.qty) || 0));
+// Pick how many of each line to return — capped at what's LEFT (sold − already returned).
+function ReturnModal({ sale, returned = {}, onClose, onConfirm, busy }) {
+  const remainingOf = (l) => Math.max(0, (Number(l.qty) || 0) - (returned[l.id != null ? String(l.id) : l.name] || 0));
+  const [qty, setQty] = useState(() => (sale.items || []).map(remainingOf));
   const lines = (sale.items || []).map((l, i) => ({ ...l, qty: qty[i] }));
   const refundTotal = lines.reduce((s, l) => s + (Number(l.price) || 0) * l.qty, 0);
-  const setI = (i, v) => setQty((q) => q.map((x, j) => (j === i ? Math.max(0, Math.min(Number(sale.items[i].qty) || 0, v)) : x)));
+  const setI = (i, v) => setQty((q) => q.map((x, j) => (j === i ? Math.max(0, Math.min(remainingOf(sale.items[i]), v)) : x)));
   return (
     <Overlay onClose={onClose}>
       <div style={{ ...S.card, width: 380, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>↩ {ARABIC ? 'استرجاع فاتورة' : 'Return sale'} #{sale.invoice_no}</div>
         {(sale.items || []).map((l, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ flex: 1 }}>{l.name} <span style={{ color: C.dim, fontSize: 12 }}>({ARABIC ? 'بيع' : 'sold'} {Number(l.qty)})</span></span>
+            <span style={{ flex: 1 }}>{l.name} <span style={{ color: C.dim, fontSize: 12 }}>
+              ({ARABIC ? 'بيع' : 'sold'} {Number(l.qty)}{remainingOf(l) < Number(l.qty) ? ` · ${ARABIC ? 'متبقٍ' : 'left'} ${remainingOf(l)}` : ''})
+            </span></span>
             <button onClick={() => setI(i, qty[i] - 1)} style={qtyBtn}>−</button>
             <span style={{ minWidth: 26, textAlign: 'center', fontWeight: 700 }}>{qty[i]}</span>
             <button onClick={() => setI(i, qty[i] + 1)} style={qtyBtn}>+</button>
