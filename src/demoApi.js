@@ -258,7 +258,16 @@ async function handle(method, path, body) {
       const u = { id: 'u-' + Date.now(), username: String(body.username).toLowerCase(), role: body.role || 'user', allowed_views: body.views || [], active: true, full_name: body.full_name || '', wage: +body.wage || 0 };
       db.users.push(u); save(db); return { id: u.id, ok: true };
     }
-    if (method === 'PUT') { const u = db.users.find((x) => x.id === parts[1]); if (u) Object.assign(u, { role: body.role ?? u.role, allowed_views: body.views ?? u.allowed_views, active: body.active ?? u.active, full_name: body.full_name ?? u.full_name, wage: body.wage ?? u.wage }); save(db); return { ok: true }; }
+    if (method === 'POST' && parts[2] === 'reset-password') return { ok: true };   // demo: no real passwords
+    if (method === 'PUT') {
+      const u = db.users.find((x) => x.id === parts[1]);
+      if (u) {
+        const uname = String(body.username || '').toLowerCase().trim();
+        if (uname && uname !== u.username && db.users.some((x) => x.username === uname)) err('exists', 400);
+        Object.assign(u, { username: uname || u.username, role: body.role ?? u.role, allowed_views: body.views ?? u.allowed_views, active: body.active ?? u.active, full_name: body.full_name ?? u.full_name, wage: body.wage ?? u.wage });
+      }
+      save(db); return { ok: true };
+    }
     if (method === 'DELETE') { db.users = db.users.filter((x) => x.id !== parts[1]); save(db); return { ok: true }; }
   }
 
