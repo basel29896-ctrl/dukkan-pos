@@ -8,22 +8,11 @@ import api from './api';
 import {
   STORE_NAME, CURRENCY, ARABIC, DEFAULT_FLOOR, BILL, SELLER, VIEWS, VIEW_LABELS, toggleLang,
 } from './client.config';
+import {
+  money, uid, nowParts, cashSuggestions, catColor, escapeHtml, remainingQty, returnedMapFor,
+} from './lib';
 
 const TOKEN_KEY = 'dukkan_token';
-
-// ── Money / misc helpers ──────────────────────────────────────────────────────
-const money = (n) => `${(Number(n) || 0).toFixed(3)} ${CURRENCY}`;
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-// Likely notes a customer hands over for `total` — next round 0.5/1/5/10/20/50 up, deduped.
-const cashSuggestions = (total) => {
-  if (!(total > 0)) return [1, 5, 10, 20, 50];
-  const ups = [0.5, 1, 5, 10, 20, 50].map((step) => Math.ceil(total / step) * step);
-  return Array.from(new Set(ups.map((v) => Number(v.toFixed(2))))).filter((v) => v >= total).slice(0, 5);
-};
-const nowParts = () => {
-  const d = new Date();
-  return { date: d.toISOString().slice(0, 10), time: d.toTimeString().slice(0, 8) };
-};
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 const C = {
@@ -31,15 +20,6 @@ const C = {
   text: '#e6e6e6', dim: '#9aa0aa', accent: '#f0a830', accentText: '#0f1117',
   green: '#3ecf8e', red: '#ff6b6b', blue: '#5b9dff',
 };
-// Deterministic accent hue per category — tiles/chips get a stable color identity,
-// so cashiers learn "dairy = teal, snacks = pink" and find things faster.
-const catHue = (cat) => {
-  let h = 0;
-  const s = String(cat || 'misc');
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
-  return h;
-};
-const catColor = (cat, a = 1) => `hsla(${catHue(cat)}, 62%, 58%, ${a})`;
 
 const S = {
   btn: { padding: '10px 16px', borderRadius: 9, border: 'none', background: C.accent, color: C.accentText, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
@@ -86,10 +66,6 @@ function printReceipt(sale) {
     setTimeout(() => document.body.removeChild(frame), 1000);
   }, 250);
 }
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
 // ── Audio feedback (WebAudio, no assets) ─────────────────────────────────────────
 // Success: one short high beep (scan accepted). Error: two low buzzes (unknown barcode).
 let _audioCtx = null;
@@ -122,6 +98,15 @@ export default function App() {
   const [booting, setBooting] = useState(true);
   const [view, setView] = useState('sales');
   const [toast, setToast] = useState(null);
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
 
   const notify = useCallback((msg, kind = 'info') => {
     setToast({ msg, kind });
@@ -180,6 +165,11 @@ export default function App() {
   return (
     <div dir="ltr" style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: ARABIC ? "'Cairo','DM Sans',system-ui,sans-serif" : "'DM Sans','Cairo',system-ui,sans-serif", display: 'flex', alignItems: 'stretch' }}>
       <main dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, padding: 16, boxSizing: 'border-box' }}>
+        {!online && (
+          <div style={{ background: C.red, color: '#fff', borderRadius: 10, padding: '10px 16px', marginBottom: 12, fontWeight: 800, fontSize: 15, textAlign: 'center' }}>
+            ⚠ {ARABIC ? 'لا يوجد اتصال — سيتم حفظ المبيعات محلياً ومزامنتها عند عودة الاتصال' : 'Offline — sales are saved locally and sync when the connection returns'}
+          </div>
+        )}
         {view === 'sales' && <SalesView user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <InventoryView isAdmin={isAdmin} notify={notify} />}
         {view === 'receive' && allowed('receive') && <ReceiveView isAdmin={isAdmin} notify={notify} />}
@@ -455,6 +445,11 @@ function Login({ onLogin }) {
 // Sales — scan → cart → checkout
 // ══════════════════════════════════════════════════════════════════════════════
 const HELD_KEY = 'dukkan_held_sales';
+const PENDING_KEY = 'dukkan_pending_sales';   // sales made offline, awaiting sync
+
+const readPending = () => { try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; } catch (_) { return []; } };
+// Network failure = fetch rejected before a response (our api errors always carry .status).
+const isNetworkError = (ex) => ex && ex.status === undefined;
 function SalesView({ user, notify }) {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);          // [{id,barcode,name,price,qty}]
@@ -578,22 +573,74 @@ function SalesView({ user, notify }) {
     setCart(h.items); persistHeld(held.filter((x) => x.id !== h.id)); setShowHeld(false);
   };
 
+  // ── Offline sales queue ────────────────────────────────────────────────────
+  // A checkout that can't reach the server is stored locally (without an invoice
+  // number) and synced automatically when the connection returns. Sync is serial
+  // and stops on the first failure, so order is preserved and nothing is lost.
+  const [pending, setPending] = useState(readPending);
+  const persistPending = (list) => { setPending(list); localStorage.setItem(PENDING_KEY, JSON.stringify(list)); };
+  const syncingRef = useRef(false);
+
+  const syncPending = useCallback(async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    try {
+      let list = readPending();
+      let synced = 0;
+      while (list.length) {
+        const s = list[0];
+        try {
+          const invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
+          await api.post('/orders', { ...s, invoice_no });
+        } catch (ex) { break; }   // still unreachable (or rejected) — retry on next online event
+        list = list.slice(1);
+        synced += 1;
+        localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+      }
+      setPending(list);
+      if (synced) {
+        notify(ARABIC ? `تمت مزامنة ${synced} فاتورة معلّقة` : `Synced ${synced} offline sale${synced > 1 ? 's' : ''}`, 'green');
+        loadProducts();
+      }
+    } finally { syncingRef.current = false; }
+  }, [notify, loadProducts]);
+
+  useEffect(() => {
+    syncPending();   // flush anything left over from a previous session
+    window.addEventListener('online', syncPending);
+    return () => window.removeEventListener('online', syncPending);
+  }, [syncPending]);
+
   const checkout = async () => {
     if (!cart.length || busy) return;
     setBusy(true);
+    const { date, time } = nowParts();
+    const sale = { id: uid(), floor: DEFAULT_FLOOR, items: cart, sub: total, tax: 0, svc: 0, disc: 0, total, pay, waiter: user.username, status: 'paid', date, time };
+    const finish = (s) => { printReceipt(s); setCart([]); setTendered(''); setPay('cash'); scanRef.current && scanRef.current.focus(); };
     try {
-      const invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
-      const { date, time } = nowParts();
-      const sale = { id: uid(), floor: DEFAULT_FLOOR, items: cart, sub: total, tax: 0, svc: 0, disc: 0, total, pay, waiter: user.username, status: 'paid', date, time, invoice_no };
-      // Server commits the order + stock deduction + stock log in ONE transaction.
-      await api.post('/orders', sale);
-      printReceipt(sale);
-      setCart([]); setTendered(''); setPay('cash');
+      let invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
+      try {
+        // Server commits the order + stock deduction + stock log in ONE transaction.
+        await api.post('/orders', { ...sale, invoice_no });
+      } catch (ex) {
+        if (ex.message === 'invoice_taken') {
+          // Another terminal took this number — grab a fresh one and retry once.
+          invoice_no = await api.get('/invoice/next?floor=' + DEFAULT_FLOOR);
+          await api.post('/orders', { ...sale, invoice_no });
+        } else throw ex;
+      }
+      finish({ ...sale, invoice_no });
       loadProducts();
       notify(ARABIC ? `تمت الفاتورة #${invoice_no}` : `Sale #${invoice_no} done`, 'green');
-      scanRef.current && scanRef.current.focus();
     } catch (ex) {
-      notify(ex.message === 'invoice_taken' ? (ARABIC ? 'تعارض رقم الفاتورة، أعد المحاولة' : 'Invoice clash — retry') : (ARABIC ? 'فشل الدفع' : 'Checkout failed'), 'red');
+      if (isNetworkError(ex)) {
+        // No server — keep the sale locally, print an OFFLINE receipt, move on.
+        persistPending([...readPending(), sale]);
+        finish({ ...sale, invoice_no: ARABIC ? 'غير متصل' : 'OFFLINE' });
+        notify(ARABIC ? 'لا اتصال — حُفظت الفاتورة محلياً وستُزامن تلقائياً' : 'Offline — sale saved locally, will sync automatically', 'green');
+      } else {
+        notify(ex.message === 'invoice_taken' ? (ARABIC ? 'تعارض رقم الفاتورة، أعد المحاولة' : 'Invoice clash — retry') : (ARABIC ? 'فشل الدفع' : 'Checkout failed'), 'red');
+      }
     } finally { setBusy(false); }
   };
 
@@ -621,6 +668,12 @@ function SalesView({ user, notify }) {
           {!!held.length && (
             <button onClick={() => setShowHeld(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
               ⏸ {ARABIC ? 'المعلّقة' : 'Held'} ({held.length})
+            </button>
+          )}
+          {!!pending.length && (
+            <button onClick={syncPending} title={ARABIC ? 'مبيعات بانتظار المزامنة — اضغط للمحاولة' : 'Sales waiting to sync — tap to retry'}
+              style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700, borderColor: C.red, color: C.red }}>
+              ⇪ {pending.length}
             </button>
           )}
         </div>
@@ -1163,20 +1216,11 @@ function HistoryView({ user, notify }) {
     } finally { setBusyId(null); }
   };
 
-  // Per-invoice map of already-returned quantities (keyed by line id, name as fallback),
-  // built from the refund rows referencing 'return of #N'. Drives the remaining-qty clamp.
-  const returnedFor = (sale) => {
-    const map = {};
-    sales.filter((o) => o.status === 'refund' && o.buyer === 'return of #' + sale.invoice_no)
-      .forEach((o) => (o.items || []).forEach((l) => {
-        const k = l.id != null ? String(l.id) : l.name;
-        map[k] = (map[k] || 0) + (Number(l.qty) || 0);
-      }));
-    return map;
-  };
+  // Already-returned quantities per line (lib.returnedMapFor) → drives the remaining clamp.
+  const returnedFor = (sale) => returnedMapFor(sale, sales);
   const fullyReturned = (sale) => {
     const map = returnedFor(sale);
-    return (sale.items || []).every((l) => (map[l.id != null ? String(l.id) : l.name] || 0) >= (Number(l.qty) || 0));
+    return (sale.items || []).every((l) => remainingQty(l, map) === 0);
   };
 
   if (loading) return <div style={{ color: C.dim }}>{ARABIC ? 'جارٍ التحميل…' : 'Loading…'}</div>;
@@ -1215,7 +1259,7 @@ function HistoryView({ user, notify }) {
 
 // Pick how many of each line to return — capped at what's LEFT (sold − already returned).
 function ReturnModal({ sale, returned = {}, onClose, onConfirm, busy }) {
-  const remainingOf = (l) => Math.max(0, (Number(l.qty) || 0) - (returned[l.id != null ? String(l.id) : l.name] || 0));
+  const remainingOf = (l) => remainingQty(l, returned);
   const [qty, setQty] = useState(() => (sale.items || []).map(remainingOf));
   const lines = (sale.items || []).map((l, i) => ({ ...l, qty: qty[i] }));
   const refundTotal = lines.reduce((s, l) => s + (Number(l.price) || 0) * l.qty, 0);
