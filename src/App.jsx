@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from './api';
 import {
-  STORE_NAME, CURRENCY, ARABIC, DEFAULT_FLOOR, BILL, SELLER, VIEWS, VIEW_LABELS,
+  STORE_NAME, CURRENCY, ARABIC, DEFAULT_FLOOR, BILL, SELLER, VIEWS, VIEW_LABELS, toggleLang,
 } from './client.config';
 
 const TOKEN_KEY = 'dukkan_token';
@@ -282,6 +282,7 @@ function Sidebar({ user, view, setView, navViews, onLogout, canSeeStock }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
         {canSeeStock && <NotificationsBell />}
         <ClockButton />
+        <button onClick={toggleLang} style={{ ...S.btnGhost, height: 56, fontSize: 16 }}>{ARABIC ? '🌐 English' : '🌐 عربي'}</button>
         <div style={{ fontSize: 14, color: C.dim, textAlign: 'center' }}>{user.full_name || user.username}</div>
         <button onClick={onLogout} style={{ ...S.btnGhost, height: 56, fontSize: 16 }}>{ARABIC ? '🚪 خروج' : '🚪 Logout'}</button>
       </div>
@@ -391,6 +392,7 @@ function Login({ onLogin }) {
       <form onSubmit={submit} dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, width: 'min(94vw, 440px)', display: 'flex', flexDirection: 'column', gap: 14, backdropFilter: 'blur(6px)', background: 'rgba(26,28,37,.92)', boxShadow: '0 20px 60px rgba(0,0,0,.55)' }}>
         <div style={{ fontWeight: 800, fontSize: 30, color: C.accent, textAlign: 'center' }}>{STORE_NAME}</div>
         <div style={{ color: C.dim, fontSize: 14, textAlign: 'center', marginTop: -8 }}>{ARABIC ? 'تسجيل الدخول' : 'Sign in'}</div>
+        <button type="button" onClick={toggleLang} style={{ ...S.btnGhost, alignSelf: 'center', padding: '6px 16px', fontSize: 13 }}>{ARABIC ? '🌐 English' : '🌐 عربي'}</button>
         <input style={fieldStyle('username')} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} value={username}
           onChange={(e) => setUsername(e.target.value)} onFocus={() => { setActive('username'); setKb(true); }}
           autoFocus autoCapitalize="off" autoComplete="off" />

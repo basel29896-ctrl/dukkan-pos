@@ -25,7 +25,21 @@ export const CLIENT = {
 // ── Derived constants (consumed by App.jsx) ───────────────────────────────────
 export const STORE_NAME = CLIENT.storeName;
 export const CURRENCY = CLIENT.currency;
-export const ARABIC = !!CLIENT.locale.arabic;
+
+// ── Language (runtime toggle, persisted) ──────────────────────────────────────
+// Default from config; user can switch AR⇄EN at runtime. Every UI string is an
+// `ARABIC ? ar : en` ternary, so flipping this + reloading re-renders the whole app.
+const LANG_KEY = "dukkan_lang";
+const defaultLang = CLIENT.locale.arabic ? "ar" : (CLIENT.locale.default || "en");
+let _lang = defaultLang;
+try { _lang = localStorage.getItem(LANG_KEY) || defaultLang; } catch (_) {}
+export const ARABIC = _lang === "ar";
+export const LANG = _lang;
+export function setLang(l) {
+  try { localStorage.setItem(LANG_KEY, l); } catch (_) {}
+  if (typeof window !== "undefined") window.location.reload();
+}
+export function toggleLang() { setLang(ARABIC ? "en" : "ar"); }
 export const DEFAULT_FLOOR = CLIENT.store.key;       // "main" — the orders table + invoice key
 export const TAX_RATE = (CLIENT.store.taxPct || 0) / 100;
 export const BILL = CLIENT.bill;
