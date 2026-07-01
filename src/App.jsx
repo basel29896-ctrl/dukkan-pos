@@ -14,6 +14,12 @@ const TOKEN_KEY = 'dukkan_token';
 // ── Money / misc helpers ──────────────────────────────────────────────────────
 const money = (n) => `${(Number(n) || 0).toFixed(3)} ${CURRENCY}`;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+// Likely notes a customer hands over for `total` — next round 0.5/1/5/10/20/50 up, deduped.
+const cashSuggestions = (total) => {
+  if (!(total > 0)) return [1, 5, 10, 20, 50];
+  const ups = [0.5, 1, 5, 10, 20, 50].map((step) => Math.ceil(total / step) * step);
+  return Array.from(new Set(ups.map((v) => Number(v.toFixed(2))))).filter((v) => v >= total).slice(0, 5);
+};
 const nowParts = () => {
   const d = new Date();
   return { date: d.toISOString().slice(0, 10), time: d.toTimeString().slice(0, 8) };
@@ -82,6 +88,28 @@ function printReceipt(sale) {
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ── Audio feedback (WebAudio, no assets) ─────────────────────────────────────────
+// Success: one short high beep (scan accepted). Error: two low buzzes (unknown barcode).
+let _audioCtx = null;
+function beep(ok = true) {
+  try {
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    const play = (freq, at, dur) => {
+      const o = _audioCtx.createOscillator();
+      const g = _audioCtx.createGain();
+      o.type = 'square'; o.frequency.value = freq;
+      o.connect(g); g.connect(_audioCtx.destination);
+      const t = _audioCtx.currentTime + at;
+      g.gain.setValueAtTime(0.08, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.start(t); o.stop(t + dur);
+    };
+    if (ok) play(1500, 0, 0.08);
+    else { play(300, 0, 0.14); play(300, 0.18, 0.14); }
+  } catch (_) { /* audio unavailable (old browser / no user gesture yet) — silent */ }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -442,7 +470,15 @@ function SalesView({ user, notify }) {
   const [busy, setBusy] = useState(false);
   const [held, setHeld] = useState(() => { try { return JSON.parse(localStorage.getItem(HELD_KEY)) || []; } catch (_) { return []; } });
   const [showHeld, setShowHeld] = useState(false);
+  const [lastAdded, setLastAdded] = useState(null);   // {name, price, qty} → green flash in bill
   const scanRef = useRef(null);
+  const flashTimer = useRef(null);
+  const flash = useCallback((line) => {
+    setLastAdded(line);
+    clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setLastAdded(null), 1800);
+  }, []);
+  useEffect(() => () => clearTimeout(flashTimer.current), []);
 
   const loadProducts = useCallback(async () => {
     try { setProducts(await api.get('/products')); } catch (_) {}
@@ -457,7 +493,9 @@ function SalesView({ user, notify }) {
       if (i >= 0) { const next = [...prev]; next[i] = { ...next[i], qty: next[i].qty + qty }; return next; }
       return [...prev, { id: p.id, barcode: p.barcode, name: p.name, price: Number(p.price) || 0, qty, unit: p.unit || 'ea' }];
     });
-  }, []);
+    beep(true);
+    flash({ name: p.name, price: Number(p.price) || 0, qty });
+  }, [flash]);
   const refocus = () => scanRef.current && scanRef.current.focus();
 
   // Add a catalogue product: weighed (kg) products open the weight keypad; others add directly.
@@ -477,10 +515,40 @@ function SalesView({ user, notify }) {
       setProducts((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
       addProduct(p);
     } catch (ex) {
-      if (ex.status === 404) setNewProduct({ barcode: c });
-      else notify(ARABIC ? 'تعذّر البحث' : 'Lookup failed', 'red');
+      if (ex.status === 404) { beep(false); setNewProduct({ barcode: c }); }
+      else { beep(false); notify(ARABIC ? 'تعذّر البحث' : 'Lookup failed', 'red'); }
     }
   };
+
+  // ── Scanner hardening ───────────────────────────────────────────────────────
+  // USB barcode scanners are keyboards: they burst characters fast and end with Enter.
+  // If focus wandered off the scan input (cashier tapped a tile, closed a modal…), we
+  // still capture the burst globally: keystrokes <100ms apart accumulate; Enter fires
+  // the scan. Slow (human) typing outside an input is ignored, as is typing in inputs.
+  const onScanRef = useRef(null);
+  onScanRef.current = onScan;
+  const modalOpenRef = useRef(false);
+  modalOpenRef.current = !!(newProduct || editLine || quickItem || weighItem || showHeld);
+  useEffect(() => {
+    let buf = '';
+    let lastTs = 0;
+    const onKeyDown = (e) => {
+      if (modalOpenRef.current) return;
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      const now = Date.now();
+      if (now - lastTs > 100) buf = '';       // gap too slow → human keys, restart buffer
+      lastTs = now;
+      if (e.key === 'Enter') {
+        if (buf.length >= 4) { e.preventDefault(); onScanRef.current(buf); }
+        buf = '';
+      } else if (e.key.length === 1) {
+        buf += e.key;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const setQty = (id, qty) => setCart((prev) => prev.flatMap((l) => (l.id === id ? (qty <= 0 ? [] : [{ ...l, qty }]) : [l])));
   const setLine = (id, patch) => setCart((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
@@ -613,6 +681,12 @@ function SalesView({ user, notify }) {
             {cart.reduce((s, l) => s + l.qty, 0)} {ARABIC ? 'صنف' : 'items'}
           </span>
         </div>
+        {lastAdded && (
+          <div className="rise" style={{ background: 'rgba(62,207,142,.14)', borderBottom: `2px solid ${C.green}`, color: C.green, padding: '10px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800, fontSize: 17 }}>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✓ {lastAdded.name}{lastAdded.qty !== 1 ? ` × ${lastAdded.qty}` : ''}</span>
+            <span style={{ flexShrink: 0 }}>{money(lastAdded.price * lastAdded.qty)}</span>
+          </div>
+        )}
         <div style={{ padding: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '38vh', overflow: 'auto' }}>
           {!cart.length && (
@@ -646,14 +720,29 @@ function SalesView({ user, notify }) {
         </div>
         {pay === 'cash' && (
           <div style={{ marginBottom: 10 }}>
-            <input style={{ ...S.input, fontSize: 16, padding: '14px' }} type="number" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={ARABIC ? 'المبلغ المدفوع' : 'Cash given'} />
+            <div style={{ ...S.input, fontSize: 20, fontWeight: 800, padding: '12px 14px', textAlign: 'center', color: tendered ? C.text : C.dim }}>
+              {tendered || (ARABIC ? 'المبلغ المدفوع' : 'Cash given')}
+            </div>
+            {/* Smart suggestions: exact + the likely notes handed over (≥ total, deduped) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 8 }}>
-              <button onClick={() => setTendered(String(total.toFixed(3)))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 800 }}>{ARABIC ? 'بالضبط' : 'Exact'}</button>
-              {[1, 5, 10, 20, 50].map((d) => (
+              <button onClick={() => setTendered(total.toFixed(3))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 800, borderColor: C.green, color: C.green }}>{ARABIC ? 'بالضبط' : 'Exact'}</button>
+              {cashSuggestions(total).map((d) => (
                 <button key={d} onClick={() => setTendered(String(d))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 700 }}>{d}</button>
               ))}
             </div>
-            {change != null && change >= 0 && <div style={{ color: C.green, fontSize: 18, marginTop: 8, fontWeight: 800 }}>{ARABIC ? 'الباقي' : 'Change'}: {money(change)}</div>}
+            {/* Touch keypad — typed input pops no keyboard on a POS screen */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 8 }}>
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0'].map((d) => (
+                <button key={d} onClick={() => setTendered((v) => (d === '.' && v.includes('.') ? v : v + d))}
+                  style={{ ...S.btnGhost, padding: '13px 0', fontSize: 18, fontWeight: 800 }}>{d}</button>
+              ))}
+              <button onClick={() => setTendered((v) => v.slice(0, -1))} style={{ ...S.btnGhost, padding: '13px 0', fontSize: 18, color: C.red }}>⌫</button>
+            </div>
+            {change != null && change >= 0 && (
+              <div style={{ background: 'rgba(62,207,142,.12)', border: `1px solid ${C.green}`, borderRadius: 10, padding: '10px 14px', marginTop: 8, display: 'flex', justifyContent: 'space-between', color: C.green, fontSize: 19, fontWeight: 800 }}>
+                <span>{ARABIC ? 'الباقي' : 'Change'}</span><span>{money(change)}</span>
+              </div>
+            )}
             {change != null && change < 0 && <div style={{ color: C.red, fontSize: 15, marginTop: 8, fontWeight: 700 }}>{ARABIC ? 'ناقص' : 'Short'}: {money(-change)}</div>}
           </div>
         )}
