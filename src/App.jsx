@@ -25,6 +25,16 @@ const C = {
   text: '#e6e6e6', dim: '#9aa0aa', accent: '#f0a830', accentText: '#0f1117',
   green: '#3ecf8e', red: '#ff6b6b', blue: '#5b9dff',
 };
+// Deterministic accent hue per category — tiles/chips get a stable color identity,
+// so cashiers learn "dairy = teal, snacks = pink" and find things faster.
+const catHue = (cat) => {
+  let h = 0;
+  const s = String(cat || 'misc');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  return h;
+};
+const catColor = (cat, a = 1) => `hsla(${catHue(cat)}, 62%, 58%, ${a})`;
+
 const S = {
   btn: { padding: '10px 16px', borderRadius: 9, border: 'none', background: C.accent, color: C.accentText, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
   btnGhost: { padding: '9px 14px', borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
@@ -140,7 +150,7 @@ export default function App() {
   const navViews = VIEWS.filter(allowed);
 
   return (
-    <div dir="ltr" style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', alignItems: 'stretch' }}>
+    <div dir="ltr" style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: ARABIC ? "'Cairo','DM Sans',system-ui,sans-serif" : "'DM Sans','Cairo',system-ui,sans-serif", display: 'flex', alignItems: 'stretch' }}>
       <main dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, padding: 16, boxSizing: 'border-box' }}>
         {view === 'sales' && <SalesView user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <InventoryView isAdmin={isAdmin} notify={notify} />}
@@ -151,7 +161,7 @@ export default function App() {
       </main>
       <Sidebar user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout} canSeeStock={allowed('inventory') || allowed('reports')} />
       {toast && (
-        <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: toast.kind === 'red' ? C.red : toast.kind === 'green' ? C.green : C.panel2, color: toast.kind === 'info' ? C.text : C.accentText, padding: '11px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, boxShadow: '0 6px 24px rgba(0,0,0,.4)', zIndex: 1000 }}>
+        <div className="toast-pop" style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: toast.kind === 'red' ? C.red : toast.kind === 'green' ? C.green : C.panel2, color: toast.kind === 'info' ? C.text : C.accentText, padding: '13px 24px', borderRadius: 12, fontWeight: 700, fontSize: 15, boxShadow: '0 10px 34px rgba(0,0,0,.5)', zIndex: 1000 }}>
           {toast.msg}
         </div>
       )}
@@ -160,7 +170,7 @@ export default function App() {
 }
 
 function Centered({ children }) {
-  return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.dim, fontFamily: "'DM Sans', system-ui, sans-serif" }}>{children}</div>;
+  return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.dim, fontFamily: ARABIC ? "'Cairo','DM Sans',system-ui,sans-serif" : "'DM Sans','Cairo',system-ui,sans-serif" }}>{children}</div>;
 }
 
 // ── Customer-facing display (open ?display=1 on a 2nd screen) ────────────────────
@@ -177,7 +187,7 @@ function CustomerDisplay() {
   const items = (state && state.items) || [];
   const total = (state && state.total) || 0;
   return (
-    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', flexDirection: 'column', padding: 28 }}>
+    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: ARABIC ? "'Cairo','DM Sans',system-ui,sans-serif" : "'DM Sans','Cairo',system-ui,sans-serif", display: 'flex', flexDirection: 'column', padding: 28 }}>
       <div style={{ fontWeight: 800, fontSize: 40, color: C.accent, textAlign: 'center', marginBottom: 18 }}>{STORE_NAME}</div>
       <div style={{ flex: 1, overflow: 'auto', maxWidth: 720, width: '100%', margin: '0 auto' }}>
         {!items.length && <div style={{ color: C.dim, fontSize: 26, textAlign: 'center', marginTop: 80 }}>{ARABIC ? 'أهلاً بك' : 'Welcome'}</div>}
@@ -267,8 +277,9 @@ function Sidebar({ user, view, setView, navViews, onLogout, canSeeStock }) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 width: '100%', height: 72, padding: '0 18px', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit',
-                border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : C.panel2,
+                border: `1px solid ${on ? C.accent : C.line}`, background: on ? `linear-gradient(135deg, ${C.accent}, #d98f1c)` : C.panel2,
                 color: on ? C.accentText : C.text, fontWeight: 700, fontSize: 18, transition: 'background .12s',
+                boxShadow: on ? '0 6px 20px rgba(240,168,48,.35)' : 'none',
               }}>
               <span style={{ fontSize: 30, lineHeight: 1 }}>{VIEW_ICONS[v]}</span>
               <span>{VIEW_LABELS[v]}</span>
@@ -385,7 +396,7 @@ function Login({ onLogin }) {
   return (
     <div dir="ltr" style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-      fontFamily: "'DM Sans', system-ui, sans-serif", padding: 'clamp(16px, 4vw, 64px)',
+      fontFamily: ARABIC ? "'Cairo','DM Sans',system-ui,sans-serif" : "'DM Sans','Cairo',system-ui,sans-serif", padding: 'clamp(16px, 4vw, 64px)',
       backgroundImage: `linear-gradient(90deg, rgba(15,17,23,.10) 0%, rgba(15,17,23,.45) 50%, rgba(15,17,23,.85) 100%), url(${bg})`,
       backgroundSize: 'cover', backgroundPosition: 'center',
     }}>
@@ -549,40 +560,69 @@ function SalesView({ user, notify }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {cats.map((c) => (
-            <button key={c} onClick={() => setCat(c)} style={{ ...S.btnGhost, padding: '10px 16px', fontSize: 14, ...(cat === c ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>
-              {c === 'all' ? (ARABIC ? 'الكل' : 'All') : c}
-            </button>
-          ))}
+          {cats.map((c) => {
+            const on = cat === c;
+            const clr = c === 'all' ? C.accent : catColor(c);
+            return (
+              <button key={c} onClick={() => setCat(c)} style={{
+                ...S.btnGhost, padding: '10px 16px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8,
+                ...(on ? { background: clr, color: '#0f1117', borderColor: clr, fontWeight: 800 } : {}),
+              }}>
+                {c !== 'all' && !on && <span style={{ width: 9, height: 9, borderRadius: 5, background: clr, display: 'inline-block' }} />}
+                {c === 'all' ? (ARABIC ? 'الكل' : 'All') : c}
+              </button>
+            );
+          })}
         </div>
 
         <input style={S.input} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={ARABIC ? 'ابحث بالاسم أو الباركود…' : 'Search by name or barcode…'} />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, alignContent: 'start' }}>
           {tiles.map((p) => (
-            <button key={p.id} onClick={() => addProduct(p)} style={{
-              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 6, height: 112, padding: 12,
-              borderRadius: 12, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, cursor: 'pointer',
-              textAlign: 'start', fontFamily: 'inherit',
+            <button key={p.id} onClick={() => addProduct(p)} className="rise" style={{
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 6, height: 112, padding: '10px 12px 12px',
+              borderRadius: 12, border: `1px solid ${C.line}`, borderTop: `3px solid ${catColor(p.cat)}`,
+              background: `linear-gradient(180deg, ${catColor(p.cat, 0.10)} 0%, ${C.panel2} 55%)`,
+              color: C.text, cursor: 'pointer', textAlign: 'start', fontFamily: 'inherit', overflow: 'hidden',
             }}>
-              <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{p.name}{p.unit === 'kg' ? ' ⚖' : ''}</span>
-              <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                {p.name}{p.unit === 'kg' ? ' ⚖' : ''}
+              </span>
+              <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                 <span style={{ color: C.accent, fontWeight: 800, fontSize: 16 }}>{money(p.price)}{p.unit === 'kg' ? (ARABIC ? '/كغ' : '/kg') : ''}</span>
-                {Number(p.stock) <= 5 && <span style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>● {Number(p.stock)}</span>}
+                {Number(p.stock) <= 5
+                  ? <span style={{ fontSize: 11, color: '#fff', background: C.red, fontWeight: 800, borderRadius: 8, padding: '2px 7px' }}>{Number(p.stock)}</span>
+                  : <span style={{ fontSize: 11, color: C.dim }}>{p.cat || ''}</span>}
               </span>
             </button>
           ))}
-          {!tiles.length && <div style={{ color: C.dim, fontSize: 14, gridColumn: '1/-1', padding: 24, textAlign: 'center' }}>{ARABIC ? 'لا منتجات — أضفها من المخزون' : 'No products — add them in Inventory'}</div>}
+          {!tiles.length && (
+            <div style={{ color: C.dim, fontSize: 15, gridColumn: '1/-1', padding: 40, textAlign: 'center' }}>
+              <div style={{ fontSize: 52, marginBottom: 12, opacity: .45 }}>📦</div>
+              {ARABIC ? 'لا منتجات — أضفها من المخزون' : 'No products — add them in Inventory'}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Right: bill */}
-      <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, flex: '0 0 400px', width: 400, position: 'sticky', top: 16, padding: 18 }}>
-        <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 10 }}>🧾 {ARABIC ? 'الفاتورة' : 'Bill'}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '42vh', overflow: 'auto' }}>
-          {!cart.length && <div style={{ color: C.dim, fontSize: 15, padding: '28px 0', textAlign: 'center' }}>{ARABIC ? 'اضغط أو امسح منتجاً للبدء' : 'Tap or scan a product to start'}</div>}
+      <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, flex: '0 0 400px', width: 400, position: 'sticky', top: 16, padding: 0, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,.35)' }}>
+        <div style={{ background: `linear-gradient(135deg, ${C.accent}, #d98f1c)`, color: C.accentText, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 800, fontSize: 20 }}>🧾 {ARABIC ? 'الفاتورة' : 'Bill'}</span>
+          <span style={{ background: 'rgba(15,17,23,.25)', borderRadius: 20, padding: '3px 12px', fontWeight: 800, fontSize: 14 }}>
+            {cart.reduce((s, l) => s + l.qty, 0)} {ARABIC ? 'صنف' : 'items'}
+          </span>
+        </div>
+        <div style={{ padding: 18 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '38vh', overflow: 'auto' }}>
+          {!cart.length && (
+            <div style={{ color: C.dim, fontSize: 15, padding: '34px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 44, marginBottom: 10, opacity: .5 }}>🛒</div>
+              {ARABIC ? 'اضغط أو امسح منتجاً للبدء' : 'Tap or scan a product to start'}
+            </div>
+          )}
           {cart.map((l) => (
-            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.line}` }}>
+            <div key={l.id} className="rise" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px dashed ${C.line}` }}>
               <button onClick={() => setEditLine(l)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', textAlign: 'start', cursor: 'pointer', color: C.text, fontFamily: 'inherit', padding: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name} <span style={{ fontSize: 12, color: C.dim }}>✎</span></div>
                 <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>{money(l.price)} × {l.qty} = {money(l.price * l.qty)}</div>
@@ -594,8 +634,8 @@ function SalesView({ user, notify }) {
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 28, fontWeight: 800, margin: '14px 0' }}>
-          <span>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ color: C.accent }}>{money(total)}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 26, fontWeight: 800, margin: '14px 0', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: '12px 16px' }}>
+          <span style={{ fontSize: 17, color: C.dim }}>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ color: C.accent }}>{money(total)}</span>
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           {['cash', 'card'].map((m) => (
@@ -626,6 +666,7 @@ function SalesView({ user, notify }) {
             <button onClick={() => { setCart([]); setTendered(''); }} style={{ ...S.btnGhost, flex: 1, padding: '12px', color: C.red }}>✕ {ARABIC ? 'إلغاء' : 'Clear'}</button>
           </div>
         )}
+        </div>
       </div>
 
       {newProduct && (
