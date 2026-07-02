@@ -3,9 +3,29 @@
   <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-    <meta name="theme-color" content="#0f1117"/>
+    <meta name="theme-color" content="#F6F7F9"/>
     <title>Dukkan POS</title>
-    <style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#0f1117;}</style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box;}
+      body{background:#F6F7F9;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+      /* Focus ring via box-shadow — inline `outline:'none'` wins over any global outline. */
+      input:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible{
+        box-shadow:0 0 0 3px rgba(37,99,235,.25);
+      }
+      /* Hover/active via filter+transition — these props are never set inline, so they apply. */
+      button{transition:filter .15s ease, box-shadow .15s ease;}
+      button:hover:not(:disabled){filter:brightness(.97);}
+      button:active:not(:disabled){filter:brightness(.94);}
+      /* Placeholder colour cannot be set through inline styles. */
+      input::placeholder{color:#94A3B8;}
+      /* Minimal scrollbars to match the restrained look. */
+      ::-webkit-scrollbar{width:10px;height:10px;}
+      ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:8px;}
+      ::-webkit-scrollbar-thumb:hover{background:#94A3B8;}
+    </style>
       <link rel="manifest" href="%PUBLIC_URL%/manifest.json"/>
     <link rel="icon" href="%PUBLIC_URL%/icons/icon-192.png"/>
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-512.png"/>

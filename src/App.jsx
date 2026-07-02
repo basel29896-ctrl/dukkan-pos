@@ -19,17 +19,62 @@ const nowParts = () => {
   return { date: d.toISOString().slice(0, 10), time: d.toTimeString().slice(0, 8) };
 };
 
-// ── Theme ──────────────────────────────────────────────────────────────────────
+// ── Design tokens — single source of truth (light, modern-minimal) ──────────────
 const C = {
-  bg: '#0f1117', panel: '#1a1c25', panel2: '#22252f', line: '#2c2f3a',
-  text: '#e6e6e6', dim: '#9aa0aa', accent: '#f0a830', accentText: '#0f1117',
-  green: '#3ecf8e', red: '#ff6b6b', blue: '#5b9dff',
+  // Surfaces
+  bg:      '#F6F7F9',   // app canvas
+  panel:   '#FFFFFF',   // cards, sidebar, modals, elevated surfaces
+  panel2:  '#F1F5F9',   // insets: table headers, hovered rows, secondary fills
+  line:    '#E5E7EB',   // hairline borders + dividers
+  // Text
+  text:    '#0F172A',   // primary
+  dim:     '#64748B',   // secondary / labels  (AA on #FFFFFF; keep ≥13px on #F1F5F9)
+  // Brand / semantic — ONE accent + red/green only
+  accent:      '#2563EB',   // primary actions, active nav, selected toggles
+  accentText:  '#FFFFFF',   // text/icon on the accent
+  accentSoft:  '#EFF4FF',   // accent-tinted fill: active nav background, highlights
+  green:       '#15803D',   // success (clock-in "open", positive deltas) — AA-safe
+  red:         '#DC2626',   // danger (delete, backspace, low stock, negatives)
+  onColor:     '#FFFFFF',   // text/icon on ANY solid semantic color
+  scrim:       'rgba(15,23,42,.40)',   // modal backdrop — stays dark on the light canvas
 };
+
+const T = {
+  radius: { sm: 6, md: 8, lg: 12, pill: 999 },
+  space:  { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
+  font: {
+    family: "'Inter', 'IBM Plex Sans Arabic', system-ui, sans-serif",
+    xs: 12, sm: 13, base: 14, lg: 16, xl: 20, display: 28, hero: 40,
+  },
+  shadow: {
+    sm: '0 1px 2px rgba(15,23,42,.05)',
+    md: '0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.04)',
+    lg: '0 10px 30px rgba(15,23,42,.12)',            // modals / dropdowns ONLY
+  },
+  // Spread onto price/total/stat numbers so digits align and read as "designed"
+  num: { fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' },
+};
+
 const S = {
-  btn: { padding: '10px 16px', borderRadius: 9, border: 'none', background: C.accent, color: C.accentText, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
-  btnGhost: { padding: '9px 14px', borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
-  input: { padding: '10px 12px', borderRadius: 8, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' },
-  card: { background: C.panel, borderRadius: 12, border: `1px solid ${C.line}`, padding: 16 },
+  btn: {
+    padding: '10px 16px', borderRadius: T.radius.md, border: 'none',
+    background: C.accent, color: C.accentText, fontWeight: 600, fontSize: T.font.base,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  btnGhost: {
+    padding: '9px 14px', borderRadius: T.radius.md, border: `1px solid ${C.line}`,
+    background: C.panel, color: C.text, fontWeight: 600, fontSize: T.font.sm,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  input: {
+    padding: '10px 12px', borderRadius: T.radius.md, border: `1px solid ${C.line}`,
+    background: C.panel, color: C.text, fontSize: T.font.base, fontFamily: 'inherit',
+    outline: 'none', width: '100%', boxSizing: 'border-box',
+  },
+  card: {
+    background: C.panel, borderRadius: T.radius.lg, border: `1px solid ${C.line}`,
+    padding: T.space.lg, boxShadow: T.shadow.sm,
+  },
 };
 
 // ── Receipt printing (hidden iframe → window.print) ─────────────────────────────
@@ -140,7 +185,7 @@ export default function App() {
   const navViews = VIEWS.filter(allowed);
 
   return (
-    <div dir="ltr" style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', alignItems: 'stretch' }}>
+    <div dir="ltr" style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: T.font.family, display: 'flex', alignItems: 'stretch' }}>
       <main dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, padding: 16, boxSizing: 'border-box' }}>
         {view === 'sales' && <SalesView user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <InventoryView isAdmin={isAdmin} notify={notify} />}
@@ -160,7 +205,7 @@ export default function App() {
 }
 
 function Centered({ children }) {
-  return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.dim, fontFamily: "'DM Sans', system-ui, sans-serif" }}>{children}</div>;
+  return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.dim, fontFamily: T.font.family }}>{children}</div>;
 }
 
 // ── Customer-facing display (open ?display=1 on a 2nd screen) ────────────────────
@@ -177,7 +222,7 @@ function CustomerDisplay() {
   const items = (state && state.items) || [];
   const total = (state && state.total) || 0;
   return (
-    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', system-ui, sans-serif", display: 'flex', flexDirection: 'column', padding: 28 }}>
+    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: T.font.family, display: 'flex', flexDirection: 'column', padding: 28 }}>
       <div style={{ fontWeight: 800, fontSize: 40, color: C.accent, textAlign: 'center', marginBottom: 18 }}>{STORE_NAME}</div>
       <div style={{ flex: 1, overflow: 'auto', maxWidth: 720, width: '100%', margin: '0 auto' }}>
         {!items.length && <div style={{ color: C.dim, fontSize: 26, textAlign: 'center', marginTop: 80 }}>{ARABIC ? 'أهلاً بك' : 'Welcome'}</div>}
@@ -301,7 +346,7 @@ function OnScreenKeyboard({ onKey, onBackspace, onEnter, onClose }) {
       {label}
     </button>
   );
-  const toggleKey = key(mode === 'num' ? 'ABC' : '123', () => setMode((m) => (m === 'num' ? 'abc' : 'num')), 1.4, { background: C.blue, color: '#fff', fontSize: 16 });
+  const toggleKey = key(mode === 'num' ? 'ABC' : '123', () => setMode((m) => (m === 'num' ? 'abc' : 'num')), 1.4, { background: C.accent, color: '#fff', fontSize: 16 });
   const bottomRow = (
     <div style={{ display: 'flex', gap: 8 }}>
       {key(ARABIC ? 'إغلاق' : 'Hide', onClose, 1.4, { fontSize: 15 })}
@@ -384,7 +429,7 @@ function Login({ onLogin }) {
   return (
     <div dir="ltr" style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-      fontFamily: "'DM Sans', system-ui, sans-serif", padding: 'clamp(16px, 4vw, 64px)',
+      fontFamily: T.font.family, padding: 'clamp(16px, 4vw, 64px)',
       backgroundImage: `linear-gradient(90deg, rgba(15,17,23,.10) 0%, rgba(15,17,23,.45) 50%, rgba(15,17,23,.85) 100%), url(${bg})`,
       backgroundSize: 'cover', backgroundPosition: 'center',
     }}>
@@ -597,7 +642,7 @@ function SalesView({ user, notify }) {
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           {['cash', 'card'].map((m) => (
-            <button key={m} onClick={() => setPay(m)} style={{ ...S.btnGhost, flex: 1, padding: '14px', fontSize: 16, ...(pay === m ? { background: C.blue, color: '#fff', borderColor: C.blue } : {}) }}>
+            <button key={m} onClick={() => setPay(m)} style={{ ...S.btnGhost, flex: 1, padding: '14px', fontSize: 16, ...(pay === m ? { background: C.accent, color: '#fff', borderColor: C.accent } : {}) }}>
               {m === 'cash' ? (ARABIC ? '💵 نقدي' : '💵 Cash') : (ARABIC ? '💳 بطاقة' : '💳 Card')}
             </button>
           ))}
@@ -807,7 +852,7 @@ function ProductModal({ initial, onClose, onSaved, notify, editing }) {
         <Field label={ARABIC ? 'تباع بـ' : 'Sold by'}>
           <div style={{ display: 'flex', gap: 8 }}>
             {[['ea', ARABIC ? 'بالقطعة' : 'Each'], ['kg', ARABIC ? 'بالوزن (كغ)' : 'Weight (kg)']].map(([v, lbl]) => (
-              <button key={v} type="button" onClick={() => setUnit(v)} style={{ ...S.btnGhost, flex: 1, padding: '10px', ...(unit === v ? { background: C.blue, color: '#fff', borderColor: C.blue } : {}) }}>{lbl}</button>
+              <button key={v} type="button" onClick={() => setUnit(v)} style={{ ...S.btnGhost, flex: 1, padding: '10px', ...(unit === v ? { background: C.accent, color: '#fff', borderColor: C.accent } : {}) }}>{lbl}</button>
             ))}
           </div>
         </Field>
@@ -835,7 +880,7 @@ function Field({ label, children }) {
 }
 function Overlay({ children, onClose }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 900, padding: 16 }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: C.scrim, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 900, padding: T.space.lg }}>
       <div onClick={(e) => e.stopPropagation()}>{children}</div>
     </div>
   );
@@ -1320,7 +1365,7 @@ function Users({ me, notify }) {
           <input style={S.input} type="number" step="0.01" value={form.wage} onChange={(e) => setForm({ ...form, wage: e.target.value })} placeholder={ARABIC ? 'أجر الساعة (اختياري)' : 'Hourly wage (optional)'} />
           <div style={{ display: 'flex', gap: 8 }}>
             {['user', 'admin'].map((r) => (
-              <button key={r} onClick={() => setForm({ ...form, role: r })} style={{ ...S.btnGhost, flex: 1, ...(form.role === r ? { background: C.blue, color: '#fff', borderColor: C.blue } : {}) }}>{r}</button>
+              <button key={r} onClick={() => setForm({ ...form, role: r })} style={{ ...S.btnGhost, flex: 1, ...(form.role === r ? { background: C.accent, color: '#fff', borderColor: C.accent } : {}) }}>{r}</button>
             ))}
           </div>
           {form.role === 'user' && (
