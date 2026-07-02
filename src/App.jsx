@@ -845,29 +845,29 @@ function ProductModal({ initial, onClose, onSaved, notify, editing }) {
 
   return (
     <Overlay onClose={onClose}>
-      <form onSubmit={save} style={{ ...S.card, width: 360, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 18 }}>{editing ? (ARABIC ? 'تعديل منتج' : 'Edit product') : (ARABIC ? 'منتج جديد' : 'New product')}</div>
+      <form onSubmit={save} style={{ ...S.card, width: 360, display: 'flex', flexDirection: 'column', gap: T.space.md, boxShadow: T.shadow.lg }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg }}>{editing ? (ARABIC ? 'تعديل منتج' : 'Edit product') : (ARABIC ? 'منتج جديد' : 'New product')}</div>
         <Field label={ARABIC ? 'الباركود' : 'Barcode'}><input style={S.input} value={barcode} onChange={(e) => setBarcode(e.target.value)} /></Field>
         <Field label={ARABIC ? 'الاسم' : 'Name'}><input ref={nameRef} style={S.input} value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label={ARABIC ? 'تباع بـ' : 'Sold by'}>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: T.space.sm }}>
             {[['ea', ARABIC ? 'بالقطعة' : 'Each'], ['kg', ARABIC ? 'بالوزن (كغ)' : 'Weight (kg)']].map(([v, lbl]) => (
-              <button key={v} type="button" onClick={() => setUnit(v)} style={{ ...S.btnGhost, flex: 1, padding: '10px', ...(unit === v ? { background: C.accent, color: '#fff', borderColor: C.accent } : {}) }}>{lbl}</button>
+              <button key={v} type="button" onClick={() => setUnit(v)} style={{ ...S.btnGhost, flex: 1, padding: `${T.space.md}px`, ...(unit === v ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>{lbl}</button>
             ))}
           </div>
         </Field>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: T.space.md }}>
           <Field label={unit === 'kg' ? (ARABIC ? 'السعر / كغ' : 'Price / kg') : (ARABIC ? 'السعر' : 'Price')}><input style={S.input} type="number" step="0.001" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
           <Field label={ARABIC ? 'الكمية' : 'Stock'}><input style={S.input} type="number" step="0.001" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: T.space.md }}>
           <Field label={ARABIC ? 'الفئة' : 'Category'}>
             <input style={S.input} list="cats" value={cat} onChange={(e) => setCat(e.target.value)} />
             <datalist id="cats">{cats.map((c) => <option key={c} value={c} />)}</datalist>
           </Field>
           <Field label={ARABIC ? 'التكلفة' : 'Cost'}><input style={S.input} type="number" step="0.001" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <div style={{ display: 'flex', gap: T.space.sm, marginTop: T.space.sm }}>
           <button type="submit" disabled={busy} style={{ ...S.btn, flex: 1, opacity: busy ? 0.6 : 1 }}>{ARABIC ? 'حفظ' : 'Save'}</button>
           <button type="button" onClick={onClose} style={S.btnGhost}>{ARABIC ? 'إلغاء' : 'Cancel'}</button>
         </div>
@@ -876,7 +876,7 @@ function ProductModal({ initial, onClose, onSaved, notify, editing }) {
   );
 }
 function Field({ label, children }) {
-  return <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.dim, fontWeight: 700 }}>{label}{children}</label>;
+  return <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: T.space.xs, fontSize: T.font.xs, color: C.dim, fontWeight: 600 }}>{label}{children}</label>;
 }
 function Overlay({ children, onClose }) {
   return (
@@ -907,14 +907,14 @@ function InventoryView({ isAdmin, notify }) {
     : products;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: T.space.lg }}>
+      <div style={{ display: 'flex', gap: T.space.md, alignItems: 'center' }}>
         <input style={{ ...S.input, flex: 1 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={ARABIC ? 'بحث عن منتج' : 'Search products'} />
         <button onClick={() => setEditing({})} style={S.btn}>{ARABIC ? '+ منتج' : '+ Product'}</button>
       </div>
       <div style={S.card}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-          <thead><tr style={{ color: C.dim, textAlign: ARABIC ? 'right' : 'left' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: T.font.base }}>
+          <thead><tr style={{ color: C.dim, background: C.panel2, textAlign: ARABIC ? 'right' : 'left' }}>
             <th style={th}>{ARABIC ? 'الاسم' : 'Name'}</th><th style={th}>{ARABIC ? 'الباركود' : 'Barcode'}</th>
             <th style={th}>{ARABIC ? 'الفئة' : 'Category'}</th><th style={{ ...th, textAlign: 'right' }}>{ARABIC ? 'السعر' : 'Price'}</th>
             <th style={{ ...th, textAlign: 'right' }}>{ARABIC ? 'المخزون' : 'Stock'}</th><th style={th}></th>
@@ -922,18 +922,18 @@ function InventoryView({ isAdmin, notify }) {
           <tbody>
             {rows.map((p) => (
               <tr key={p.id} style={{ borderTop: `1px solid ${C.line}` }}>
-                <td style={td}>{p.name}</td>
-                <td style={{ ...td, color: C.dim, fontFamily: 'monospace' }}>{p.barcode || '—'}</td>
+                <td style={{ ...td, fontWeight: 600 }}>{p.name}</td>
+                <td style={{ ...td, color: C.dim, fontFamily: 'monospace', fontSize: T.font.sm }}>{p.barcode || '—'}</td>
                 <td style={{ ...td, color: C.dim }}>{p.cat || '—'}</td>
-                <td style={{ ...td, textAlign: 'right' }}>{money(p.price)}</td>
-                <td style={{ ...td, textAlign: 'right', color: Number(p.stock) <= 5 ? C.red : C.text }}>{Number(p.stock)}</td>
+                <td style={{ ...td, textAlign: 'right', ...T.num }}>{money(p.price)}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 600, ...T.num, color: Number(p.stock) <= 5 ? C.red : C.text }}>{Number(p.stock)}</td>
                 <td style={{ ...td, textAlign: 'end', whiteSpace: 'nowrap' }}>
-                  <button onClick={() => setEditing(p)} style={{ ...S.btnGhost, padding: '5px 10px' }}>{ARABIC ? 'تعديل' : 'Edit'}</button>
-                  {isAdmin && <button onClick={() => remove(p)} style={{ ...S.btnGhost, padding: '5px 10px', color: C.red, marginInlineStart: 6 }}>{ARABIC ? 'حذف' : 'Del'}</button>}
+                  <button onClick={() => setEditing(p)} style={{ ...S.btnGhost, padding: `${T.space.xs}px ${T.space.md}px` }}>{ARABIC ? 'تعديل' : 'Edit'}</button>
+                  {isAdmin && <button onClick={() => remove(p)} style={{ ...S.btnGhost, padding: `${T.space.xs}px ${T.space.md}px`, color: C.red, marginInlineStart: T.space.sm }}>{ARABIC ? 'حذف' : 'Del'}</button>}
                 </td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={6} style={{ ...td, color: C.dim, textAlign: 'center', padding: 24 }}>{ARABIC ? 'لا منتجات' : 'No products'}</td></tr>}
+            {!rows.length && <tr><td colSpan={6} style={{ ...td, color: C.dim, textAlign: 'center', padding: T.space.xl }}>{ARABIC ? 'لا منتجات' : 'No products'}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -945,8 +945,8 @@ function InventoryView({ isAdmin, notify }) {
     </div>
   );
 }
-const th = { padding: '6px 8px', fontWeight: 700, fontSize: 12 };
-const td = { padding: '8px' };
+const th = { padding: `${T.space.sm}px`, fontWeight: 600, fontSize: T.font.xs };
+const td = { padding: `${T.space.md}px ${T.space.sm}px` };
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Receive — restock with supplier + expiry (creates a batch, bumps stock)
@@ -984,9 +984,9 @@ function ReceiveView({ isAdmin, notify }) {
 
   const sel = { ...S.input, appearance: 'auto' };
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
-      <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 18 }}>📥 {ARABIC ? 'استلام بضاعة' : 'Receive stock'}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: T.space.lg, alignItems: 'start' }}>
+      <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: T.space.md }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg }}>📥 {ARABIC ? 'استلام بضاعة' : 'Receive stock'}</div>
         <Field label={ARABIC ? 'المنتج' : 'Product'}>
           <select style={sel} value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })}>
             <option value="">{ARABIC ? '— اختر —' : '— select —'}</option>
@@ -999,39 +999,39 @@ function ReceiveView({ isAdmin, notify }) {
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </Field>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: T.space.md }}>
           <Field label={ARABIC ? 'الكمية' : 'Quantity'}><input style={S.input} type="number" step="0.001" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} /></Field>
           <Field label={ARABIC ? 'التكلفة/وحدة' : 'Cost/unit'}><input style={S.input} type="number" step="0.001" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></Field>
         </div>
         <Field label={ARABIC ? 'تاريخ الانتهاء' : 'Expiry date'}><input style={S.input} type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} /></Field>
-        <button onClick={receive} disabled={busy} style={{ ...S.btn, padding: '14px', fontSize: 16, opacity: busy ? 0.6 : 1 }}>{ARABIC ? '＋ استلام وتحديث المخزون' : '＋ Receive & add to stock'}</button>
+        <button onClick={receive} disabled={busy} style={{ ...S.btn, padding: `${T.space.md}px`, fontSize: T.font.lg, opacity: busy ? 0.6 : 1 }}>{ARABIC ? '＋ استلام وتحديث المخزون' : '＋ Receive & add to stock'}</button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontWeight: 800, fontSize: 16 }}>🏷 {ARABIC ? 'الموردون' : 'Suppliers'}</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: T.space.lg }}>
+        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: T.space.sm }}>
+          <div style={{ fontWeight: 700, fontSize: T.font.lg }}>🏷 {ARABIC ? 'الموردون' : 'Suppliers'}</div>
+          <div style={{ display: 'flex', gap: T.space.sm }}>
             <input style={S.input} value={newSup.name} onChange={(e) => setNewSup({ ...newSup, name: e.target.value })} placeholder={ARABIC ? 'اسم المورّد' : 'Supplier name'} />
             <input style={{ ...S.input, maxWidth: 130 }} value={newSup.phone} onChange={(e) => setNewSup({ ...newSup, phone: e.target.value })} placeholder={ARABIC ? 'هاتف' : 'Phone'} />
             <button onClick={addSupplier} style={S.btn}>＋</button>
           </div>
           {suppliers.map((s) => (
-            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${C.line}`, fontSize: 14 }}>
-              <span>{s.name}</span><span style={{ color: C.dim }}>{s.phone || ''}</span>
+            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.sm}px 0`, borderTop: `1px solid ${C.line}`, fontSize: T.font.base }}>
+              <span style={{ fontWeight: 600 }}>{s.name}</span><span style={{ color: C.dim, ...T.num }}>{s.phone || ''}</span>
             </div>
           ))}
-          {!suppliers.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا موردين' : 'No suppliers'}</div>}
+          {!suppliers.length && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا موردين' : 'No suppliers'}</div>}
         </div>
 
         <div style={{ ...S.card }}>
-          <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>{ARABIC ? 'آخر الاستلامات' : 'Recent receipts'}</div>
+          <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.sm }}>{ARABIC ? 'آخر الاستلامات' : 'Recent receipts'}</div>
           {batches.slice(0, 12).map((b) => (
-            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: `1px solid ${C.line}`, fontSize: 13 }}>
-              <span>{b.product} <span style={{ color: C.dim }}>×{Number(b.qty)}</span></span>
+            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.xs}px 0`, borderTop: `1px solid ${C.line}`, fontSize: T.font.sm }}>
+              <span>{b.product} <span style={{ color: C.dim, ...T.num }}>×{Number(b.qty)}</span></span>
               <span style={{ color: C.dim }}>{b.supplier || '—'}{b.expiry ? ' · ⌛' + b.expiry : ''}</span>
             </div>
           ))}
-          {!batches.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا شيء بعد' : 'Nothing yet'}</div>}
+          {!batches.length && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا شيء بعد' : 'Nothing yet'}</div>}
         </div>
       </div>
     </div>
