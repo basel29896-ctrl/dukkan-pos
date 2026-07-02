@@ -266,8 +266,11 @@ function NotificationsBell() {
       <button onClick={() => setOpen((o) => !o)} style={{ ...S.btnGhost, height: 64, fontSize: 20, position: 'relative' }}>
         🔔{count > 0 && <span style={{ position: 'absolute', top: 6, insetInlineEnd: 6, background: C.red, color: '#fff', borderRadius: 10, fontSize: 11, fontWeight: 800, padding: '1px 6px' }}>{count}</span>}
       </button>
+      {open && <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />}
       {open && (
-        <div style={{ position: 'absolute', insetInlineEnd: 0, top: 70, width: 300, maxHeight: 360, overflow: 'auto', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, zIndex: 1000, boxShadow: '0 8px 30px rgba(0,0,0,.5)' }}>
+        // Fixed to the viewport, floating beside the sidebar — an absolute panel would be
+        // clipped by the sidebar's own width + overflow-y:auto.
+        <div className="rise" style={{ position: 'fixed', right: 236, bottom: 16, width: 320, maxHeight: '70vh', overflow: 'auto', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, zIndex: 1000, boxShadow: '0 12px 40px rgba(0,0,0,.55)' }}>
           <div style={{ fontWeight: 800, marginBottom: 6, color: C.red }}>{ARABIC ? 'مخزون منخفض' : 'Low stock'} ({low.length})</div>
           {low.slice(0, 8).map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}><span>{p.name}</span><span style={{ color: C.red }}>{Number(p.stock)}</span></div>)}
           <div style={{ fontWeight: 800, margin: '10px 0 6px', color: C.accent }}>{ARABIC ? 'قرب الانتهاء' : 'Expiring'} ({exp.length})</div>
