@@ -287,7 +287,7 @@ function NotificationsBell() {
           {low.slice(0, 8).map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}><span>{p.name}</span><span style={{ color: C.red }}>{Number(p.stock)}</span></div>)}
           <div style={{ fontWeight: 800, margin: '10px 0 6px', color: C.accent }}>{ARABIC ? 'قرب الانتهاء' : 'Expiring'} ({exp.length})</div>
           {exp.slice(0, 8).map((e) => <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}><span>{e.product}</span><span style={{ color: Number(e.days_left) < 0 ? C.red : C.accent }}>{e.expiry}</span></div>)}
-          {!count && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا تنبيهات' : 'All good'}</div>}
+          {!count && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا تنبيهات' : 'All good'}</div>}
         </div>
       )}
     </div>
@@ -1075,8 +1075,8 @@ function HistoryView({ user, notify }) {
   if (loading) return <div style={{ color: C.dim }}>{ARABIC ? 'جارٍ التحميل…' : 'Loading…'}</div>;
   return (
     <div style={S.card}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-        <thead><tr style={{ color: C.dim, textAlign: ARABIC ? 'right' : 'left' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: T.font.base }}>
+        <thead><tr style={{ color: C.dim, background: C.panel2, textAlign: ARABIC ? 'right' : 'left' }}>
           <th style={th}>#</th><th style={th}>{ARABIC ? 'التاريخ' : 'Date'}</th><th style={th}>{ARABIC ? 'الأصناف' : 'Items'}</th>
           <th style={th}>{ARABIC ? 'الدفع' : 'Pay'}</th><th style={{ ...th, textAlign: 'right' }}>{ARABIC ? 'المجموع' : 'Total'}</th><th style={th}></th>
         </tr></thead>
@@ -1085,19 +1085,19 @@ function HistoryView({ user, notify }) {
             const isRefund = Number(s.total) < 0 || s.pay === 'refund';
             return (
               <tr key={s.id} style={{ borderTop: `1px solid ${C.line}`, opacity: isRefund ? 0.7 : 1 }}>
-                <td style={td}>{s.invoice_no}</td>
-                <td style={{ ...td, color: C.dim }}>{s.date} {s.time}</td>
-                <td style={{ ...td, color: C.dim }}>{(s.items || []).reduce((n, l) => n + (l.qty || 0), 0)}</td>
-                <td style={td}>{isRefund ? (ARABIC ? '↩ استرجاع' : '↩ refund') : s.pay}</td>
-                <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isRefund ? C.red : C.text }}>{money(s.total)}</td>
+                <td style={{ ...td, fontWeight: 600, ...T.num }}>{s.invoice_no}</td>
+                <td style={{ ...td, color: C.dim, ...T.num }}>{s.date} {s.time}</td>
+                <td style={{ ...td, color: C.dim, ...T.num }}>{(s.items || []).reduce((n, l) => n + (l.qty || 0), 0)}</td>
+                <td style={{ ...td, color: isRefund ? C.red : C.text }}>{isRefund ? (ARABIC ? '↩ استرجاع' : '↩ refund') : s.pay}</td>
+                <td style={{ ...td, textAlign: 'right', fontWeight: 600, ...T.num, color: isRefund ? C.red : C.text }}>{money(s.total)}</td>
                 <td style={{ ...td, textAlign: 'end', whiteSpace: 'nowrap' }}>
-                  <button onClick={() => printReceipt(s)} style={{ ...S.btnGhost, padding: '6px 12px' }}>{ARABIC ? 'طباعة' : 'Print'}</button>
-                  {!isRefund && <button onClick={() => setReturning(s)} disabled={busyId === s.id} style={{ ...S.btnGhost, padding: '6px 12px', color: C.red, marginInlineStart: 6 }}>{busyId === s.id ? '…' : (ARABIC ? 'استرجاع' : 'Return')}</button>}
+                  <button onClick={() => printReceipt(s)} style={{ ...S.btnGhost, padding: `${T.space.xs}px ${T.space.md}px` }}>{ARABIC ? 'طباعة' : 'Print'}</button>
+                  {!isRefund && <button onClick={() => setReturning(s)} disabled={busyId === s.id} style={{ ...S.btnGhost, padding: `${T.space.xs}px ${T.space.md}px`, color: C.red, marginInlineStart: T.space.sm }}>{busyId === s.id ? '…' : (ARABIC ? 'استرجاع' : 'Return')}</button>}
                 </td>
               </tr>
             );
           })}
-          {!sales.length && <tr><td colSpan={6} style={{ ...td, color: C.dim, textAlign: 'center', padding: 24 }}>{ARABIC ? 'لا مبيعات بعد' : 'No sales yet'}</td></tr>}
+          {!sales.length && <tr><td colSpan={6} style={{ ...td, color: C.dim, textAlign: 'center', padding: T.space.xl }}>{ARABIC ? 'لا مبيعات بعد' : 'No sales yet'}</td></tr>}
         </tbody>
       </table>
       {returning && <ReturnModal sale={returning} busy={busyId === returning.id} onClose={() => setReturning(null)} onConfirm={(lines) => doReturn(returning, lines)} />}
@@ -1113,22 +1113,22 @@ function ReturnModal({ sale, onClose, onConfirm, busy }) {
   const setI = (i, v) => setQty((q) => q.map((x, j) => (j === i ? Math.max(0, Math.min(Number(sale.items[i].qty) || 0, v)) : x)));
   return (
     <Overlay onClose={onClose}>
-      <div style={{ ...S.card, width: 380, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 18 }}>↩ {ARABIC ? 'استرجاع فاتورة' : 'Return sale'} #{sale.invoice_no}</div>
+      <div style={{ ...S.card, width: 380, display: 'flex', flexDirection: 'column', gap: T.space.md, boxShadow: T.shadow.lg }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg }}>↩ {ARABIC ? 'استرجاع فاتورة' : 'Return sale'} #{sale.invoice_no}</div>
         {(sale.items || []).map((l, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ flex: 1 }}>{l.name} <span style={{ color: C.dim, fontSize: 12 }}>({ARABIC ? 'بيع' : 'sold'} {Number(l.qty)})</span></span>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: T.space.sm }}>
+            <span style={{ flex: 1, fontWeight: 600 }}>{l.name} <span style={{ color: C.dim, fontSize: T.font.xs, fontWeight: 500 }}>({ARABIC ? 'بيع' : 'sold'} {Number(l.qty)})</span></span>
             <button onClick={() => setI(i, qty[i] - 1)} style={qtyBtn}>−</button>
-            <span style={{ minWidth: 26, textAlign: 'center', fontWeight: 700 }}>{qty[i]}</span>
+            <span style={{ minWidth: 26, textAlign: 'center', fontWeight: 700, ...T.num }}>{qty[i]}</span>
             <button onClick={() => setI(i, qty[i] + 1)} style={qtyBtn}>+</button>
           </div>
         ))}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 18, marginTop: 4 }}>
-          <span>{ARABIC ? 'مبلغ الاسترجاع' : 'Refund'}</span><span style={{ color: C.red }}>{money(refundTotal)}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: T.space.xs }}>
+          <span style={{ fontSize: T.font.lg, fontWeight: 600, color: C.dim }}>{ARABIC ? 'مبلغ الاسترجاع' : 'Refund'}</span><span style={{ color: C.red, fontSize: T.font.xl, fontWeight: 700, ...T.num }}>{money(refundTotal)}</span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => onConfirm(lines)} disabled={busy || refundTotal <= 0} style={{ ...S.btn, flex: 1, padding: '14px', opacity: busy || refundTotal <= 0 ? 0.5 : 1 }}>{ARABIC ? 'تأكيد الاسترجاع' : 'Confirm return'}</button>
-          <button onClick={onClose} style={{ ...S.btnGhost, padding: '14px' }}>{ARABIC ? 'إلغاء' : 'Cancel'}</button>
+        <div style={{ display: 'flex', gap: T.space.sm }}>
+          <button onClick={() => onConfirm(lines)} disabled={busy || refundTotal <= 0} style={{ ...S.btn, flex: 1, padding: `${T.space.md}px`, opacity: busy || refundTotal <= 0 ? 0.5 : 1 }}>{ARABIC ? 'تأكيد الاسترجاع' : 'Confirm return'}</button>
+          <button onClick={onClose} style={{ ...S.btnGhost, padding: `${T.space.md}px` }}>{ARABIC ? 'إلغاء' : 'Cancel'}</button>
         </div>
       </div>
     </Overlay>
@@ -1182,90 +1182,90 @@ function ReportsView({ notify }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
-        <Field label={ARABIC ? 'من' : 'From'}><input style={S.input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-        <Field label={ARABIC ? 'إلى' : 'To'}><input style={S.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+      <div style={{ display: 'flex', gap: T.space.md, alignItems: 'end', flexWrap: 'wrap' }}>
+        <Field label={ARABIC ? 'من' : 'From'}><input style={{ ...S.input, ...T.num }} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+        <Field label={ARABIC ? 'إلى' : 'To'}><input style={{ ...S.input, ...T.num }} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
         <button onClick={exportCSV} style={{ ...S.btnGhost, height: 42 }}>⬇ {ARABIC ? 'تصدير CSV' : 'Export CSV'}</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: T.space.md }}>
         <Stat label={ARABIC ? 'الإيراد' : 'Revenue'} value={money(sum && sum.revenue)} accent />
         <Stat label={ARABIC ? 'عدد الفواتير' : 'Sales'} value={sum ? sum.orders : '—'} />
         <Stat label={ARABIC ? 'وحدات مباعة' : 'Units sold'} value={sum ? Number(sum.units) : '—'} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: T.space.lg }}>
         <div style={S.card}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ARABIC ? 'الأكثر مبيعاً' : 'Top products'}</div>
+          <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.sm }}>{ARABIC ? 'الأكثر مبيعاً' : 'Top products'}</div>
           {top.map((t, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
-              <span>{t.name}</span><span style={{ color: C.dim }}>{Number(t.units)} · {money(t.revenue)}</span>
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}`, fontSize: T.font.base }}>
+              <span>{t.name}</span><span style={{ color: C.dim, ...T.num }}>{Number(t.units)} · {money(t.revenue)}</span>
             </div>
           ))}
-          {!top.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا بيانات' : 'No data'}</div>}
+          {!top.length && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا بيانات' : 'No data'}</div>}
         </div>
         <div style={S.card}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ARABIC ? 'مخزون منخفض' : 'Low stock'}</div>
+          <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.sm }}>{ARABIC ? 'مخزون منخفض' : 'Low stock'}</div>
           {low.map((p) => (
-            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
-              <span>{p.name}</span><span style={{ color: Number(p.stock) <= 0 ? C.red : C.accent }}>{Number(p.stock)}</span>
+            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}`, fontSize: T.font.base }}>
+              <span>{p.name}</span><span style={{ color: Number(p.stock) <= 0 ? C.red : C.accent, fontWeight: 600, ...T.num }}>{Number(p.stock)}</span>
             </div>
           ))}
-          {!low.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'كل المخزون جيد' : 'All stocked'}</div>}
+          {!low.length && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'كل المخزون جيد' : 'All stocked'}</div>}
         </div>
       </div>
       <div style={S.card}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>⌛ {ARABIC ? 'قرب الانتهاء (٣٠ يوم)' : 'Expiring soon (30 days)'}</div>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.sm }}>⌛ {ARABIC ? 'قرب الانتهاء (٣٠ يوم)' : 'Expiring soon (30 days)'}</div>
         {exp.map((e) => {
           const dl = Number(e.days_left);
           const col = dl < 0 ? C.red : dl <= 7 ? C.accent : C.dim;
           return (
-            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
+            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}`, fontSize: T.font.base }}>
               <span>{e.product} {e.supplier ? <span style={{ color: C.dim, fontSize: 12 }}>· {e.supplier}</span> : null}</span>
-              <span style={{ color: col, fontWeight: 700 }}>{e.expiry} ({dl < 0 ? (ARABIC ? 'منتهي' : 'expired') : dl + (ARABIC ? ' يوم' : 'd')})</span>
+              <span style={{ color: col, fontWeight: 600, ...T.num }}>{e.expiry} ({dl < 0 ? (ARABIC ? 'منتهي' : 'expired') : dl + (ARABIC ? ' يوم' : 'd')})</span>
             </div>
           );
         })}
-        {!exp.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا شيء قريب الانتهاء' : 'Nothing expiring soon'}</div>}
+        {!exp.length && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا شيء قريب الانتهاء' : 'Nothing expiring soon'}</div>}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: T.space.lg }}>
         {/* Z-report: daily close-out by payment method */}
         <div style={S.card}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>🧮 {ARABIC ? 'تقرير اليوم (إغلاق)' : 'Z-Report (close-out)'} — {to}</div>
+          <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.sm }}>🧮 {ARABIC ? 'تقرير اليوم (إغلاق)' : 'Z-Report (close-out)'} — {to}</div>
           {zrep && zrep.lines.map((l) => (
-            <div key={l.pay} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
-              <span style={{ textTransform: 'capitalize' }}>{l.pay} <span style={{ color: C.dim, fontSize: 12 }}>×{l.orders}</span></span><span style={{ fontWeight: 700 }}>{money(l.total)}</span>
+            <div key={l.pay} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}`, fontSize: T.font.base }}>
+              <span style={{ textTransform: 'capitalize' }}>{l.pay} <span style={{ color: C.dim, fontSize: T.font.xs, ...T.num }}>×{l.orders}</span></span><span style={{ fontWeight: 600, ...T.num }}>{money(l.total)}</span>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, fontWeight: 800 }}>
-            <span>{ARABIC ? 'الصافي' : 'Net'}</span><span style={{ color: C.accent }}>{money(zrep && zrep.net)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: T.space.sm }}>
+            <span style={{ fontWeight: 600, color: C.dim }}>{ARABIC ? 'الصافي' : 'Net'}</span><span style={{ color: C.accent, fontSize: T.font.xl, fontWeight: 700, ...T.num }}>{money(zrep && zrep.net)}</span>
           </div>
         </div>
         {/* Employee hours */}
         <div style={S.card}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>🕐 {ARABIC ? 'ساعات الموظفين' : 'Employee hours'}</div>
+          <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.sm }}>🕐 {ARABIC ? 'ساعات الموظفين' : 'Employee hours'}</div>
           {hoursByUser.map((h) => (
-            <div key={h.username} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.line}`, fontSize: 14 }}>
-              <span>{h.username}</span><span style={{ color: C.dim }}>{h.hours.toFixed(2)} {ARABIC ? 'ساعة' : 'h'}</span>
+            <div key={h.username} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}`, fontSize: T.font.base }}>
+              <span>{h.username}</span><span style={{ color: C.dim, ...T.num }}>{h.hours.toFixed(2)} {ARABIC ? 'ساعة' : 'h'}</span>
             </div>
           ))}
-          {!hoursByUser.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا سجلّات' : 'No punches'}</div>}
+          {!hoursByUser.length && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا سجلّات' : 'No punches'}</div>}
         </div>
       </div>
 
       {/* ABC analysis */}
       <div style={S.card}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>🅰 {ARABIC ? 'تحليل ABC (مساهمة الإيراد)' : 'ABC analysis (revenue contribution)'}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.sm }}>🅰 {ARABIC ? 'تحليل ABC (مساهمة الإيراد)' : 'ABC analysis (revenue contribution)'}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: T.space.md }}>
           {[['A', C.green, ARABIC ? 'الأهم (٨٠٪)' : 'Top (80%)'], ['B', C.accent, ARABIC ? 'متوسط (١٥٪)' : 'Mid (15%)'], ['C', C.dim, ARABIC ? 'الأقل (٥٪)' : 'Low (5%)']].map(([cls, col, lbl]) => (
             <div key={cls}>
-              <div style={{ fontWeight: 800, color: col, marginBottom: 4 }}>{cls} · {lbl} ({abcClass(cls).length})</div>
+              <div style={{ fontWeight: 700, color: col, marginBottom: T.space.xs }}>{cls} · {lbl} ({abcClass(cls).length})</div>
               {abcClass(cls).slice(0, 8).map((x, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</span><span style={{ color: C.dim, marginInlineStart: 6 }}>{money(x.revenue)}</span></div>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: T.font.sm, padding: `${T.space.xs}px 0` }}><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</span><span style={{ color: C.dim, marginInlineStart: T.space.sm, ...T.num }}>{money(x.revenue)}</span></div>
               ))}
             </div>
           ))}
         </div>
-        {!abc.length && <div style={{ color: C.dim, fontSize: 13 }}>{ARABIC ? 'لا بيانات مبيعات' : 'No sales data'}</div>}
+        {!abc.length && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا بيانات مبيعات' : 'No sales data'}</div>}
       </div>
     </div>
   );
@@ -1273,8 +1273,8 @@ function ReportsView({ notify }) {
 function Stat({ label, value, accent }) {
   return (
     <div style={S.card}>
-      <div style={{ color: C.dim, fontSize: 12, fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4, color: accent ? C.accent : C.text }}>{value}</div>
+      <div style={{ color: C.dim, fontSize: T.font.xs, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: T.font.display, fontWeight: 700, marginTop: T.space.xs, letterSpacing: '-0.02em', ...T.num, color: accent ? C.accent : C.text }}>{value}</div>
     </div>
   );
 }
