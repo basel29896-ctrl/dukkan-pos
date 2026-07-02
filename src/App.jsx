@@ -89,9 +89,9 @@ export default function App() {
   const navViews = VIEWS.filter(allowed);
 
   return (
-    // Direction-aware shell: the sidebar sits at the inline-start of the row,
-    // i.e. right in Arabic (RTL) and left in English (LTR).
-    <div dir={ARABIC ? 'rtl' : 'ltr'} className="flex min-h-screen items-stretch bg-background font-sans text-foreground">
+    // Fixed shell: the sidebar is always pinned to the physical LEFT in both
+    // languages; only the content inside follows the language direction.
+    <div dir="ltr" className="flex min-h-screen items-stretch bg-background font-sans text-foreground">
       <Sidebar user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout}
         canSeeStock={allowed('inventory') || allowed('reports')} />
       <main dir={ARABIC ? 'rtl' : 'ltr'} className="min-w-0 flex-1 p-4">

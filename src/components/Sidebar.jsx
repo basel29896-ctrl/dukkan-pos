@@ -24,7 +24,7 @@ function NotificationsBell() {
   }, []);
   const count = low.length + exp.length;
   return (
-    <Popover placement={ARABIC ? 'left-end' : 'right-end'} offset={12}>
+    <Popover placement="right-end" offset={12}>
       <PopoverTrigger>
         <Button fullWidth variant="bordered" className="justify-start"
           startContent={
@@ -79,7 +79,7 @@ function ClockButton() {
 export default function Sidebar({ user, view, setView, navViews, onLogout, canSeeStock }) {
   return (
     <aside dir={ARABIC ? 'rtl' : 'ltr'}
-      className="sticky top-0 flex h-screen w-56 shrink-0 flex-col gap-3 overflow-y-auto border-e border-divider bg-content1 p-3">
+      className="sticky top-0 flex h-screen w-56 shrink-0 flex-col gap-3 overflow-y-auto border-r border-divider bg-content1 p-3">
       <div className="py-2 text-center text-xl font-bold tracking-tight text-foreground">{STORE_NAME}</div>
 
       <nav className="flex flex-col gap-1">
