@@ -186,7 +186,7 @@ export default function App() {
 
   return (
     <div dir="ltr" style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: T.font.family, display: 'flex', alignItems: 'stretch' }}>
-      <main dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, padding: 16, boxSizing: 'border-box' }}>
+      <main dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, padding: T.space.lg, boxSizing: 'border-box' }}>
         {view === 'sales' && <SalesView user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <InventoryView isAdmin={isAdmin} notify={notify} />}
         {view === 'receive' && allowed('receive') && <ReceiveView isAdmin={isAdmin} notify={notify} />}
@@ -196,7 +196,7 @@ export default function App() {
       </main>
       <Sidebar user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout} canSeeStock={allowed('inventory') || allowed('reports')} />
       {toast && (
-        <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: toast.kind === 'red' ? C.red : toast.kind === 'green' ? C.green : C.panel2, color: toast.kind === 'info' ? C.text : C.accentText, padding: '11px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, boxShadow: '0 6px 24px rgba(0,0,0,.4)', zIndex: 1000 }}>
+        <div style={{ position: 'fixed', bottom: T.space.xl, left: '50%', transform: 'translateX(-50%)', background: toast.kind === 'red' ? C.red : toast.kind === 'green' ? C.green : C.panel, color: toast.kind === 'info' ? C.text : C.onColor, border: toast.kind === 'info' ? `1px solid ${C.line}` : 'none', padding: `${T.space.md}px ${T.space.xl}px`, borderRadius: T.radius.lg, fontWeight: 600, fontSize: T.font.base, boxShadow: T.shadow.lg, zIndex: 1000 }}>
           {toast.msg}
         </div>
       )}
@@ -222,23 +222,23 @@ function CustomerDisplay() {
   const items = (state && state.items) || [];
   const total = (state && state.total) || 0;
   return (
-    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: T.font.family, display: 'flex', flexDirection: 'column', padding: 28 }}>
-      <div style={{ fontWeight: 800, fontSize: 40, color: C.accent, textAlign: 'center', marginBottom: 18 }}>{STORE_NAME}</div>
+    <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: T.font.family, display: 'flex', flexDirection: 'column', padding: T.space.xl }}>
+      <div style={{ fontWeight: 700, fontSize: T.font.display, color: C.text, letterSpacing: '-0.02em', textAlign: 'center', marginBottom: T.space.lg }}>{STORE_NAME}</div>
       <div style={{ flex: 1, overflow: 'auto', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-        {!items.length && <div style={{ color: C.dim, fontSize: 26, textAlign: 'center', marginTop: 80 }}>{ARABIC ? 'أهلاً بك' : 'Welcome'}</div>}
+        {!items.length && <div style={{ color: C.dim, fontSize: T.font.display, textAlign: 'center', marginTop: 80 }}>{ARABIC ? 'أهلاً بك' : 'Welcome'}</div>}
         {items.map((l, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: `1px solid ${C.line}`, fontSize: 26 }}>
-            <span>{l.name} <span style={{ color: C.dim, fontSize: 20 }}>× {l.qty}</span></span>
-            <span style={{ fontWeight: 700 }}>{money(l.price * l.qty)}</span>
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.md}px 0`, borderBottom: `1px solid ${C.line}`, fontSize: T.font.display }}>
+            <span>{l.name} <span style={{ color: C.dim, fontSize: T.font.xl }}>× {l.qty}</span></span>
+            <span style={{ fontWeight: 600, ...T.num }}>{money(l.price * l.qty)}</span>
           </div>
         ))}
       </div>
-      <div style={{ maxWidth: 720, width: '100%', margin: '0 auto', borderTop: `2px solid ${C.accent}`, paddingTop: 16, display: 'flex', justifyContent: 'space-between', fontSize: 48, fontWeight: 800 }}>
-        <span>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ color: C.accent }}>{money(total)}</span>
+      <div style={{ maxWidth: 720, width: '100%', margin: '0 auto', borderTop: `2px solid ${C.text}`, paddingTop: T.space.lg, display: 'flex', justifyContent: 'space-between', fontSize: T.font.hero, fontWeight: 700 }}>
+        <span>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ ...T.num }}>{money(total)}</span>
       </div>
       {state && state.change != null && state.change >= 0 && (
-        <div style={{ maxWidth: 720, width: '100%', margin: '6px auto 0', display: 'flex', justifyContent: 'space-between', fontSize: 30, color: C.green, fontWeight: 700 }}>
-          <span>{ARABIC ? 'الباقي' : 'Change'}</span><span>{money(state.change)}</span>
+        <div style={{ maxWidth: 720, width: '100%', margin: `${T.space.sm}px auto 0`, display: 'flex', justifyContent: 'space-between', fontSize: T.font.display, color: C.green, fontWeight: 700 }}>
+          <span>{ARABIC ? 'الباقي' : 'Change'}</span><span style={{ ...T.num }}>{money(state.change)}</span>
         </div>
       )}
     </div>
@@ -299,23 +299,23 @@ function Sidebar({ user, view, setView, navViews, onLogout, canSeeStock }) {
   return (
     <aside dir={ARABIC ? 'rtl' : 'ltr'} style={{
       width: 220, flex: '0 0 220px', background: C.panel, borderInlineStart: `1px solid ${C.line}`,
-      display: 'flex', flexDirection: 'column', gap: 10, padding: 14, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', gap: T.space.md, padding: T.space.md, boxSizing: 'border-box',
       position: 'sticky', top: 0, height: '100vh', overflowY: 'auto',
     }}>
-      <div style={{ fontWeight: 800, fontSize: 26, color: C.accent, textAlign: 'center', padding: '6px 0 10px' }}>{STORE_NAME}</div>
+      <div style={{ fontWeight: 700, fontSize: T.font.xl, color: C.text, letterSpacing: '-0.02em', textAlign: 'center', padding: `${T.space.sm}px 0` }}>{STORE_NAME}</div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: T.space.xs }}>
         {navViews.map((v) => {
           const on = view === v;
           return (
             <button key={v} onClick={() => setView(v)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                width: '100%', height: 72, padding: '0 18px', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit',
-                border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : C.panel2,
-                color: on ? C.accentText : C.text, fontWeight: 700, fontSize: 18, transition: 'background .12s',
+                display: 'flex', alignItems: 'center', gap: T.space.md,
+                width: '100%', height: 52, padding: `0 ${T.space.md}px`, borderRadius: T.radius.md, cursor: 'pointer', fontFamily: 'inherit',
+                border: 'none', background: on ? C.accentSoft : C.panel,
+                color: on ? C.accent : C.dim, fontWeight: 600, fontSize: T.font.lg, transition: 'background .12s, color .12s',
               }}>
-              <span style={{ fontSize: 30, lineHeight: 1 }}>{VIEW_ICONS[v]}</span>
+              <span style={{ fontSize: T.font.xl, lineHeight: 1 }}>{VIEW_ICONS[v]}</span>
               <span>{VIEW_LABELS[v]}</span>
             </button>
           );
@@ -324,11 +324,11 @@ function Sidebar({ user, view, setView, navViews, onLogout, canSeeStock }) {
 
       <div style={{ flex: 1 }} />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: T.space.sm, borderTop: `1px solid ${C.line}`, paddingTop: T.space.md }}>
         {canSeeStock && <NotificationsBell />}
         <ClockButton />
-        <div style={{ fontSize: 14, color: C.dim, textAlign: 'center' }}>{user.full_name || user.username}</div>
-        <button onClick={onLogout} style={{ ...S.btnGhost, height: 56, fontSize: 16 }}>{ARABIC ? '🚪 خروج' : '🚪 Logout'}</button>
+        <div style={{ fontSize: T.font.sm, color: C.dim, textAlign: 'center' }}>{user.full_name || user.username}</div>
+        <button onClick={onLogout} style={{ ...S.btnGhost, height: 48, fontSize: T.font.base }}>{ARABIC ? '🚪 خروج' : '🚪 Logout'}</button>
       </div>
     </aside>
   );
@@ -342,16 +342,16 @@ function OnScreenKeyboard({ onKey, onBackspace, onEnter, onClose }) {
   const [caps, setCaps] = useState(false);
   const key = (label, onTap, flex = 1, extra = {}) => (
     <button key={label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={onTap}
-      style={{ flex, minWidth: 0, height: 56, borderRadius: 10, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 20, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', userSelect: 'none', ...extra }}>
+      style={{ flex, minWidth: 0, height: 56, borderRadius: T.radius.md, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: T.font.xl, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', userSelect: 'none', ...extra }}>
       {label}
     </button>
   );
-  const toggleKey = key(mode === 'num' ? 'ABC' : '123', () => setMode((m) => (m === 'num' ? 'abc' : 'num')), 1.4, { background: C.accent, color: '#fff', fontSize: 16 });
+  const toggleKey = key(mode === 'num' ? 'ABC' : '123', () => setMode((m) => (m === 'num' ? 'abc' : 'num')), 1.4, { color: C.dim, fontSize: T.font.lg });
   const bottomRow = (
     <div style={{ display: 'flex', gap: 8 }}>
-      {key(ARABIC ? 'إغلاق' : 'Hide', onClose, 1.4, { fontSize: 15 })}
+      {key(ARABIC ? 'إغلاق' : 'Hide', onClose, 1.4, { color: C.dim, fontSize: T.font.lg })}
       {key('␣', () => onKey(' '), 4)}
-      {key(ARABIC ? 'دخول' : 'Enter', onEnter, 2, { background: C.green, color: C.accentText, fontSize: 16 })}
+      {key(ARABIC ? 'دخول' : 'Enter', onEnter, 2, { background: C.accent, color: C.accentText, fontSize: T.font.lg })}
     </div>
   );
 
@@ -365,7 +365,7 @@ function OnScreenKeyboard({ onKey, onBackspace, onEnter, onClose }) {
         <div style={{ display: 'flex', gap: 8 }}>
           {toggleKey}
           {cell('0')}
-          {key('⌫', onBackspace, 1.4, { background: C.red, color: '#fff' })}
+          {key('⌫', onBackspace, 1.4, { background: C.red, color: C.onColor })}
         </div>
         {bottomRow}
       </div>
@@ -385,13 +385,13 @@ function OnScreenKeyboard({ onKey, onBackspace, onEnter, onClose }) {
         <div key={i} style={{ display: 'flex', gap: 8 }}>
           {i === 3 && key(caps ? '⇧' : '⇪', () => setCaps((c) => !c), 1.4, caps ? { background: C.accent, color: C.accentText } : {})}
           {r.map(cell)}
-          {i === 3 && key('⌫', onBackspace, 1.4, { background: C.red, color: '#fff' })}
+          {i === 3 && key('⌫', onBackspace, 1.4, { background: C.red, color: C.onColor })}
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8 }}>
         {toggleKey}
         {key('␣', () => onKey(' '), 4)}
-        {key(ARABIC ? 'دخول' : 'Enter', onEnter, 2, { background: C.green, color: C.accentText, fontSize: 16 })}
+        {key(ARABIC ? 'دخول' : 'Enter', onEnter, 2, { background: C.accent, color: C.accentText, fontSize: T.font.lg })}
       </div>
     </div>
   );
@@ -423,32 +423,32 @@ function Login({ onLogin }) {
   const onKey = (ch) => setActiveValue((v) => v + ch);
   const onBackspace = () => setActiveValue((v) => v.slice(0, -1));
 
-  const fieldStyle = (name) => ({ ...S.input, fontSize: 17, padding: '14px 14px', ...(active === name && kb ? { borderColor: C.accent, boxShadow: `0 0 0 2px ${C.accent}33` } : {}) });
+  const fieldStyle = (name) => ({ ...S.input, fontSize: T.font.lg, padding: `${T.space.md}px ${T.space.lg}px`, ...(active === name && kb ? { borderColor: C.accent, boxShadow: `0 0 0 3px ${C.accent}40` } : {}) });
 
   const bg = (process.env.PUBLIC_URL || '') + '/login-bg.png';
   return (
     <div dir="ltr" style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
       fontFamily: T.font.family, padding: 'clamp(16px, 4vw, 64px)',
-      backgroundImage: `linear-gradient(90deg, rgba(15,17,23,.10) 0%, rgba(15,17,23,.45) 50%, rgba(15,17,23,.85) 100%), url(${bg})`,
+      backgroundImage: `linear-gradient(90deg, ${C.bg}00 0%, ${C.bg}59 45%, ${C.bg}F2 100%), url(${bg})`,
       backgroundSize: 'cover', backgroundPosition: 'center',
     }}>
-      <form onSubmit={submit} dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, width: 'min(94vw, 440px)', display: 'flex', flexDirection: 'column', gap: 14, backdropFilter: 'blur(6px)', background: 'rgba(26,28,37,.92)', boxShadow: '0 20px 60px rgba(0,0,0,.55)' }}>
-        <div style={{ fontWeight: 800, fontSize: 30, color: C.accent, textAlign: 'center' }}>{STORE_NAME}</div>
-        <div style={{ color: C.dim, fontSize: 14, textAlign: 'center', marginTop: -8 }}>{ARABIC ? 'تسجيل الدخول' : 'Sign in'}</div>
+      <form onSubmit={submit} dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, width: 'min(94vw, 440px)', display: 'flex', flexDirection: 'column', gap: T.space.md, padding: T.space.xl, backdropFilter: 'blur(8px)', background: `${C.panel}F2`, boxShadow: T.shadow.lg }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.display, color: C.text, letterSpacing: '-0.02em', textAlign: 'center' }}>{STORE_NAME}</div>
+        <div style={{ color: C.dim, fontSize: T.font.base, textAlign: 'center', marginTop: -T.space.sm }}>{ARABIC ? 'تسجيل الدخول' : 'Sign in'}</div>
         <input style={fieldStyle('username')} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} value={username}
           onChange={(e) => setUsername(e.target.value)} onFocus={() => { setActive('username'); setKb(true); }}
           autoFocus autoCapitalize="off" autoComplete="off" />
         <input style={fieldStyle('password')} type="password" placeholder={ARABIC ? 'كلمة المرور' : 'Password'} value={password}
           onChange={(e) => setPassword(e.target.value)} onFocus={() => { setActive('password'); setKb(true); }} autoComplete="off" />
-        {err && <div style={{ color: C.red, fontSize: 14 }}>{err}</div>}
+        {err && <div style={{ color: C.red, fontSize: T.font.sm }}>{err}</div>}
         {process.env.REACT_APP_DEMO === '1' && (
-          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: 10, fontSize: 12, color: C.dim, textAlign: 'center' }}>
+          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: T.radius.md, padding: T.space.md, fontSize: T.font.sm, color: C.dim, textAlign: 'center' }}>
             DEMO — no backend. Sign in: <b style={{ color: C.accent }}>admin</b> / any password<br />or <b style={{ color: C.accent }}>cashier</b> (limited views). Data is local to your browser.
           </div>
         )}
-        <button type="submit" disabled={busy} style={{ ...S.btn, padding: '16px', fontSize: 18, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : (ARABIC ? 'دخول' : 'Login')}</button>
-        {!kb && <button type="button" onClick={() => setKb(true)} style={{ ...S.btnGhost, padding: '12px' }}>{ARABIC ? 'إظهار لوحة المفاتيح' : 'Show keyboard'}</button>}
+        <button type="submit" disabled={busy} style={{ ...S.btn, padding: `${T.space.lg}px`, fontSize: T.font.lg, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : (ARABIC ? 'دخول' : 'Login')}</button>
+        {!kb && <button type="button" onClick={() => setKb(true)} style={{ ...S.btnGhost, padding: `${T.space.md}px` }}>{ARABIC ? 'إظهار لوحة المفاتيح' : 'Show keyboard'}</button>}
         {kb && <OnScreenKeyboard onKey={onKey} onBackspace={onBackspace} onEnter={submit} onClose={() => setKb(false)} />}
       </form>
     </div>
