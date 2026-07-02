@@ -282,7 +282,7 @@ function NotificationsBell() {
         🔔{count > 0 && <span style={{ position: 'absolute', top: 6, insetInlineEnd: 6, background: C.red, color: C.onColor, borderRadius: T.radius.pill, fontSize: T.font.xs, fontWeight: 700, padding: '1px 6px', ...T.num }}>{count}</span>}
       </button>
       {open && (
-        <div style={{ position: 'absolute', insetInlineStart: 0, bottom: 54, width: 300, maxHeight: 360, overflow: 'auto', background: C.panel, border: `1px solid ${C.line}`, borderRadius: T.radius.lg, padding: T.space.md, zIndex: 1000, boxShadow: T.shadow.lg }}>
+        <div style={{ position: 'fixed', insetInlineStart: 236, bottom: T.space.lg, width: 320, maxHeight: 420, overflow: 'auto', background: C.panel, border: `1px solid ${C.line}`, borderRadius: T.radius.lg, padding: T.space.lg, zIndex: 1000, boxShadow: T.shadow.lg }}>
           <div style={{ fontWeight: 700, fontSize: T.font.sm, marginBottom: T.space.xs, color: C.red }}>{ARABIC ? 'مخزون منخفض' : 'Low stock'} ({low.length})</div>
           {low.slice(0, 8).map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: T.font.sm, padding: `${T.space.xs}px 0` }}><span>{p.name}</span><span style={{ color: C.red, fontWeight: 600, ...T.num }}>{Number(p.stock)}</span></div>)}
           <div style={{ fontWeight: 700, fontSize: T.font.sm, margin: `${T.space.md}px 0 ${T.space.xs}px`, color: C.accent }}>{ARABIC ? 'قرب الانتهاء' : 'Expiring'} ({exp.length})</div>
@@ -945,7 +945,7 @@ function InventoryView({ isAdmin, notify }) {
     </div>
   );
 }
-const th = { padding: `${T.space.sm}px`, fontWeight: 600, fontSize: T.font.xs };
+const th = { padding: `${T.space.sm}px`, fontWeight: 600, fontSize: T.font.sm };
 const td = { padding: `${T.space.md}px ${T.space.sm}px` };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1219,7 +1219,7 @@ function ReportsView({ notify }) {
           const col = dl < 0 ? C.red : dl <= 7 ? C.accent : C.dim;
           return (
             <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}`, fontSize: T.font.base }}>
-              <span>{e.product} {e.supplier ? <span style={{ color: C.dim, fontSize: 12 }}>· {e.supplier}</span> : null}</span>
+              <span>{e.product} {e.supplier ? <span style={{ color: C.dim, fontSize: T.font.xs }}>· {e.supplier}</span> : null}</span>
               <span style={{ color: col, fontWeight: 600, ...T.num }}>{e.expiry} ({dl < 0 ? (ARABIC ? 'منتهي' : 'expired') : dl + (ARABIC ? ' يوم' : 'd')})</span>
             </div>
           );
