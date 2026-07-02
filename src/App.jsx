@@ -19,8 +19,10 @@ const nowParts = () => {
   return { date: d.toISOString().slice(0, 10), time: d.toTimeString().slice(0, 8) };
 };
 
-// ── Design tokens — single source of truth (light, modern-minimal) ──────────────
-const C = {
+// ── Design tokens — single source of truth ──────────────────────────────────────
+// Two palettes share one shape; THEME picks one at module load (localStorage-backed,
+// the toggle writes the preference and reloads — every C.* read is boot-time).
+const LIGHT = {
   // Surfaces
   bg:      '#F6F7F9',   // app canvas
   panel:   '#FFFFFF',   // cards, sidebar, modals, elevated surfaces
@@ -38,6 +40,26 @@ const C = {
   onColor:     '#FFFFFF',   // text/icon on ANY solid semantic color
   scrim:       'rgba(15,23,42,.40)',   // modal backdrop — stays dark on the light canvas
 };
+const DARK = {
+  // Surfaces — slate ramp; borders (not shadows) carry the elevation on dark
+  bg:      '#0B0F17',
+  panel:   '#151B26',
+  panel2:  '#1E2735',
+  line:    '#2A3444',
+  // Text
+  text:    '#E6EAF0',
+  dim:     '#94A3B8',
+  // Brand / semantic — brightened one step so they read on dark surfaces
+  accent:      '#3B82F6',
+  accentText:  '#FFFFFF',
+  accentSoft:  '#1C2A44',
+  green:       '#16A34A',
+  red:         '#EF4444',
+  onColor:     '#FFFFFF',
+  scrim:       'rgba(0,0,0,.55)',
+};
+const THEME = (() => { try { return localStorage.getItem('dukkan_theme') === 'dark' ? 'dark' : 'light'; } catch (_) { return 'light'; } })();
+const C = THEME === 'dark' ? DARK : LIGHT;
 
 const T = {
   radius: { sm: 6, md: 8, lg: 12, pill: 999 },
@@ -76,6 +98,10 @@ const S = {
     padding: T.space.lg, boxShadow: T.shadow.sm,
   },
 };
+
+// Persist a language/theme preference and reload — ARABIC and C are resolved at module
+// load, so a full reload is the swap mechanism (the session token survives in localStorage).
+const setPref = (key, value) => { try { localStorage.setItem(key, value); } catch (_) {} window.location.reload(); };
 
 // ── Receipt printing (hidden iframe → window.print) ─────────────────────────────
 function printReceipt(sale) {
@@ -327,6 +353,10 @@ function Sidebar({ user, view, setView, navViews, onLogout, canSeeStock }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: T.space.sm, borderTop: `1px solid ${C.line}`, paddingTop: T.space.md }}>
         {canSeeStock && <NotificationsBell />}
         <ClockButton />
+        <div style={{ display: 'flex', gap: T.space.sm }}>
+          <button onClick={() => setPref('dukkan_lang', ARABIC ? 'en' : 'ar')} style={{ ...S.btnGhost, flex: 1, height: 40, fontSize: T.font.sm }}>{ARABIC ? 'English' : 'عربية'}</button>
+          <button onClick={() => setPref('dukkan_theme', THEME === 'dark' ? 'light' : 'dark')} style={{ ...S.btnGhost, flex: 1, height: 40, fontSize: T.font.sm }}>{THEME === 'dark' ? (ARABIC ? '☀️ فاتح' : '☀️ Light') : (ARABIC ? '🌙 داكن' : '🌙 Dark')}</button>
+        </div>
         <div style={{ fontSize: T.font.sm, color: C.dim, textAlign: 'center' }}>{user.full_name || user.username}</div>
         <button onClick={onLogout} style={{ ...S.btnGhost, height: 48, fontSize: T.font.base }}>{ARABIC ? '🚪 خروج' : '🚪 Logout'}</button>
       </div>
@@ -450,6 +480,10 @@ function Login({ onLogin }) {
         <button type="submit" disabled={busy} style={{ ...S.btn, padding: `${T.space.lg}px`, fontSize: T.font.lg, opacity: busy ? 0.6 : 1 }}>{busy ? '…' : (ARABIC ? 'دخول' : 'Login')}</button>
         {!kb && <button type="button" onClick={() => setKb(true)} style={{ ...S.btnGhost, padding: `${T.space.md}px` }}>{ARABIC ? 'إظهار لوحة المفاتيح' : 'Show keyboard'}</button>}
         {kb && <OnScreenKeyboard onKey={onKey} onBackspace={onBackspace} onEnter={submit} onClose={() => setKb(false)} />}
+        <div style={{ display: 'flex', gap: T.space.sm }}>
+          <button type="button" onClick={() => setPref('dukkan_lang', ARABIC ? 'en' : 'ar')} style={{ ...S.btnGhost, flex: 1, padding: `${T.space.sm}px`, fontSize: T.font.sm }}>{ARABIC ? 'English' : 'عربية'}</button>
+          <button type="button" onClick={() => setPref('dukkan_theme', THEME === 'dark' ? 'light' : 'dark')} style={{ ...S.btnGhost, flex: 1, padding: `${T.space.sm}px`, fontSize: T.font.sm }}>{THEME === 'dark' ? (ARABIC ? '☀️ فاتح' : '☀️ Light') : (ARABIC ? '🌙 داكن' : '🌙 Dark')}</button>
+        </div>
       </form>
     </div>
   );

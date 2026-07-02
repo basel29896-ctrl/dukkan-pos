@@ -25,7 +25,15 @@ export const CLIENT = {
 // ── Derived constants (consumed by App.jsx) ───────────────────────────────────
 export const STORE_NAME = CLIENT.storeName;
 export const CURRENCY = CLIENT.currency;
-export const ARABIC = !!CLIENT.locale.arabic;
+// Language: a saved runtime preference (in-app toggle, reload to apply) wins over the
+// config default. VIEW_LABELS below derives from this, so it must be resolved first.
+export const ARABIC = (() => {
+  try {
+    const saved = localStorage.getItem('dukkan_lang');
+    if (saved) return saved === 'ar';
+  } catch (_) {}
+  return !!CLIENT.locale.arabic;
+})();
 export const DEFAULT_FLOOR = CLIENT.store.key;       // "main" — the orders table + invoice key
 export const TAX_RATE = (CLIENT.store.taxPct || 0) / 100;
 export const BILL = CLIENT.bill;
