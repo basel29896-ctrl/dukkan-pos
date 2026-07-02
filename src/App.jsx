@@ -89,7 +89,11 @@ export default function App() {
   const navViews = VIEWS.filter(allowed);
 
   return (
-    <div dir="ltr" className="flex min-h-screen items-stretch bg-background font-sans text-foreground">
+    // Direction-aware shell: the sidebar sits at the inline-start of the row,
+    // i.e. right in Arabic (RTL) and left in English (LTR).
+    <div dir={ARABIC ? 'rtl' : 'ltr'} className="flex min-h-screen items-stretch bg-background font-sans text-foreground">
+      <Sidebar user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout}
+        canSeeStock={allowed('inventory') || allowed('reports')} />
       <main dir={ARABIC ? 'rtl' : 'ltr'} className="min-w-0 flex-1 p-4">
         {view === 'sales' && <Sales user={user} notify={notify} />}
         {view === 'inventory' && allowed('inventory') && <Inventory isAdmin={isAdmin} notify={notify} />}
@@ -98,8 +102,6 @@ export default function App() {
         {view === 'reports' && allowed('reports') && <Reports notify={notify} />}
         {view === 'settings' && <Settings user={user} isAdmin={isAdmin} notify={notify} />}
       </main>
-      <Sidebar user={user} view={view} setView={setView} navViews={navViews} onLogout={handleLogout}
-        canSeeStock={allowed('inventory') || allowed('reports')} />
     </div>
   );
 }
