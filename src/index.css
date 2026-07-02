@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* App-level globals Tailwind utilities can't express per-element. */
+html, body, #root { height: 100%; }
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Minimal scrollbars, themed. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: theme('colors.zinc.300'); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: theme('colors.zinc.400'); }
+.dark ::-webkit-scrollbar-thumb { background: theme('colors.zinc.700'); }
+.dark ::-webkit-scrollbar-thumb:hover { background: theme('colors.zinc.600'); }
+
+/* Money/qty figures align in columns wherever .tnum is applied. */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
