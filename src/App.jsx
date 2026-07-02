@@ -576,16 +576,16 @@ function SalesView({ user, notify }) {
       {/* Left: scan + tap-to-add product tiles */}
       <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', gap: 10 }}>
-          <input ref={scanRef} style={{ ...S.input, fontSize: 18, padding: '14px', letterSpacing: 1 }}
+          <input ref={scanRef} style={{ ...S.input, fontSize: T.font.lg, padding: `${T.space.md}px ${T.space.lg}px`, letterSpacing: 1 }}
             value={scan} onChange={(e) => setScan(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') onScan(scan); }}
             placeholder={ARABIC ? '🔍 امسح الباركود أو اضغط منتجاً' : '🔍 Scan barcode or tap a product'} inputMode="search" />
-          <button onClick={() => setQuickItem(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
+          <button onClick={() => setQuickItem(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: T.font.base }}>
             ＋ {ARABIC ? 'صنف يدوي' : 'Quick item'}
           </button>
-          <button onClick={openDisplay} title={ARABIC ? 'شاشة الزبون' : 'Customer screen'} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>🖥</button>
+          <button onClick={openDisplay} title={ARABIC ? 'شاشة الزبون' : 'Customer screen'} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: T.font.base }}>🖥</button>
           {!!held.length && (
-            <button onClick={() => setShowHeld(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: 15, fontWeight: 700 }}>
+            <button onClick={() => setShowHeld(true)} style={{ ...S.btnGhost, whiteSpace: 'nowrap', fontSize: T.font.base }}>
               ⏸ {ARABIC ? 'المعلّقة' : 'Held'} ({held.length})
             </button>
           )}
@@ -593,7 +593,7 @@ function SalesView({ user, notify }) {
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {cats.map((c) => (
-            <button key={c} onClick={() => setCat(c)} style={{ ...S.btnGhost, padding: '10px 16px', fontSize: 14, ...(cat === c ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>
+            <button key={c} onClick={() => setCat(c)} style={{ ...S.btnGhost, padding: `${T.space.sm}px ${T.space.lg}px`, borderRadius: T.radius.pill, fontSize: T.font.base, ...(cat === c ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>
               {c === 'all' ? (ARABIC ? 'الكل' : 'All') : c}
             </button>
           ))}
@@ -601,72 +601,72 @@ function SalesView({ user, notify }) {
 
         <input style={S.input} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={ARABIC ? 'ابحث بالاسم أو الباركود…' : 'Search by name or barcode…'} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, alignContent: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: T.space.md, alignContent: 'start' }}>
           {tiles.map((p) => (
             <button key={p.id} onClick={() => addProduct(p)} style={{
-              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 6, height: 112, padding: 12,
-              borderRadius: 12, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, cursor: 'pointer',
-              textAlign: 'start', fontFamily: 'inherit',
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: T.space.sm, height: 112, padding: T.space.md,
+              borderRadius: T.radius.lg, border: `1px solid ${C.line}`, background: C.panel, color: C.text, cursor: 'pointer',
+              textAlign: 'start', fontFamily: 'inherit', boxShadow: T.shadow.sm,
             }}>
-              <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{p.name}{p.unit === 'kg' ? ' ⚖' : ''}</span>
+              <span style={{ fontSize: T.font.base, fontWeight: 600, lineHeight: 1.3 }}>{p.name}{p.unit === 'kg' ? ' ⚖' : ''}</span>
               <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: C.accent, fontWeight: 800, fontSize: 16 }}>{money(p.price)}{p.unit === 'kg' ? (ARABIC ? '/كغ' : '/kg') : ''}</span>
-                {Number(p.stock) <= 5 && <span style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>● {Number(p.stock)}</span>}
+                <span style={{ color: C.text, fontWeight: 700, fontSize: T.font.lg, ...T.num }}>{money(p.price)}{p.unit === 'kg' ? (ARABIC ? '/كغ' : '/kg') : ''}</span>
+                {Number(p.stock) <= 5 && <span style={{ fontSize: T.font.xs, color: C.red, fontWeight: 700, ...T.num }}>● {Number(p.stock)}</span>}
               </span>
             </button>
           ))}
-          {!tiles.length && <div style={{ color: C.dim, fontSize: 14, gridColumn: '1/-1', padding: 24, textAlign: 'center' }}>{ARABIC ? 'لا منتجات — أضفها من المخزون' : 'No products — add them in Inventory'}</div>}
+          {!tiles.length && <div style={{ color: C.dim, fontSize: T.font.base, gridColumn: '1/-1', padding: T.space.xl, textAlign: 'center' }}>{ARABIC ? 'لا منتجات — أضفها من المخزون' : 'No products — add them in Inventory'}</div>}
         </div>
       </div>
 
       {/* Right: bill */}
-      <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, flex: '0 0 400px', width: 400, position: 'sticky', top: 16, padding: 18 }}>
-        <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 10 }}>🧾 {ARABIC ? 'الفاتورة' : 'Bill'}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '42vh', overflow: 'auto' }}>
-          {!cart.length && <div style={{ color: C.dim, fontSize: 15, padding: '28px 0', textAlign: 'center' }}>{ARABIC ? 'اضغط أو امسح منتجاً للبدء' : 'Tap or scan a product to start'}</div>}
+      <div dir={ARABIC ? 'rtl' : 'ltr'} style={{ ...S.card, flex: '0 0 400px', width: 400, position: 'sticky', top: T.space.lg }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg, marginBottom: T.space.md }}>🧾 {ARABIC ? 'الفاتورة' : 'Bill'}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: T.space.xs, maxHeight: '42vh', overflow: 'auto' }}>
+          {!cart.length && <div style={{ color: C.dim, fontSize: T.font.base, padding: `${T.space.xl}px 0`, textAlign: 'center' }}>{ARABIC ? 'اضغط أو امسح منتجاً للبدء' : 'Tap or scan a product to start'}</div>}
           {cart.map((l) => (
-            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.line}` }}>
+            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: T.space.sm, padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}` }}>
               <button onClick={() => setEditLine(l)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', textAlign: 'start', cursor: 'pointer', color: C.text, fontFamily: 'inherit', padding: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name} <span style={{ fontSize: 12, color: C.dim }}>✎</span></div>
-                <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>{money(l.price)} × {l.qty} = {money(l.price * l.qty)}</div>
+                <div style={{ fontSize: T.font.base, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name} <span style={{ fontSize: T.font.xs, color: C.dim }}>✎</span></div>
+                <div style={{ fontSize: T.font.sm, color: C.dim, fontWeight: 500, ...T.num }}>{money(l.price)} × {l.qty} = {money(l.price * l.qty)}</div>
               </button>
               <button onClick={() => setQty(l.id, l.qty - 1)} style={qtyBtn}>−</button>
-              <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 800, fontSize: 16 }}>{l.qty}</span>
+              <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 700, fontSize: T.font.lg, ...T.num }}>{l.qty}</span>
               <button onClick={() => setQty(l.id, l.qty + 1)} style={qtyBtn}>+</button>
-              <button onClick={() => removeLine(l.id)} style={{ ...qtyBtn, color: C.red, borderColor: C.red }}>×</button>
+              <button onClick={() => removeLine(l.id)} style={{ ...qtyBtn, color: C.red }}>×</button>
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 28, fontWeight: 800, margin: '14px 0' }}>
-          <span>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ color: C.accent }}>{money(total)}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: `${T.space.lg}px 0` }}>
+          <span style={{ fontSize: T.font.lg, fontWeight: 600, color: C.dim }}>{ARABIC ? 'المجموع' : 'Total'}</span><span style={{ fontSize: T.font.hero, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1, ...T.num }}>{money(total)}</span>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: T.space.sm, marginBottom: T.space.md }}>
           {['cash', 'card'].map((m) => (
-            <button key={m} onClick={() => setPay(m)} style={{ ...S.btnGhost, flex: 1, padding: '14px', fontSize: 16, ...(pay === m ? { background: C.accent, color: '#fff', borderColor: C.accent } : {}) }}>
+            <button key={m} onClick={() => setPay(m)} style={{ ...S.btnGhost, flex: 1, padding: `${T.space.md}px`, fontSize: T.font.lg, ...(pay === m ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>
               {m === 'cash' ? (ARABIC ? '💵 نقدي' : '💵 Cash') : (ARABIC ? '💳 بطاقة' : '💳 Card')}
             </button>
           ))}
         </div>
         {pay === 'cash' && (
-          <div style={{ marginBottom: 10 }}>
-            <input style={{ ...S.input, fontSize: 16, padding: '14px' }} type="number" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={ARABIC ? 'المبلغ المدفوع' : 'Cash given'} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 8 }}>
-              <button onClick={() => setTendered(String(total.toFixed(3)))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 800 }}>{ARABIC ? 'بالضبط' : 'Exact'}</button>
+          <div style={{ marginBottom: T.space.md }}>
+            <input style={{ ...S.input, fontSize: T.font.lg, padding: `${T.space.md}px ${T.space.lg}px`, ...T.num }} type="number" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={ARABIC ? 'المبلغ المدفوع' : 'Cash given'} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: T.space.sm, marginTop: T.space.sm }}>
+              <button onClick={() => setTendered(String(total.toFixed(3)))} style={{ ...S.btnGhost, padding: `${T.space.md}px`, fontWeight: 600 }}>{ARABIC ? 'بالضبط' : 'Exact'}</button>
               {[1, 5, 10, 20, 50].map((d) => (
-                <button key={d} onClick={() => setTendered(String(d))} style={{ ...S.btnGhost, padding: '12px', fontWeight: 700 }}>{d}</button>
+                <button key={d} onClick={() => setTendered(String(d))} style={{ ...S.btnGhost, padding: `${T.space.md}px`, fontWeight: 600, ...T.num }}>{d}</button>
               ))}
             </div>
-            {change != null && change >= 0 && <div style={{ color: C.green, fontSize: 18, marginTop: 8, fontWeight: 800 }}>{ARABIC ? 'الباقي' : 'Change'}: {money(change)}</div>}
-            {change != null && change < 0 && <div style={{ color: C.red, fontSize: 15, marginTop: 8, fontWeight: 700 }}>{ARABIC ? 'ناقص' : 'Short'}: {money(-change)}</div>}
+            {change != null && change >= 0 && <div style={{ color: C.green, fontSize: T.font.lg, marginTop: T.space.sm, fontWeight: 700, ...T.num }}>{ARABIC ? 'الباقي' : 'Change'}: {money(change)}</div>}
+            {change != null && change < 0 && <div style={{ color: C.red, fontSize: T.font.base, marginTop: T.space.sm, fontWeight: 600, ...T.num }}>{ARABIC ? 'ناقص' : 'Short'}: {money(-change)}</div>}
           </div>
         )}
-        <button onClick={checkout} disabled={!cart.length || busy} style={{ ...S.btn, width: '100%', padding: '18px', fontSize: 19, opacity: (!cart.length || busy) ? 0.5 : 1 }}>
+        <button onClick={checkout} disabled={!cart.length || busy} style={{ ...S.btn, width: '100%', padding: `${T.space.lg}px`, fontSize: T.font.xl, fontWeight: 700, opacity: (!cart.length || busy) ? 0.5 : 1 }}>
           {busy ? '…' : (ARABIC ? '✓ إتمام وطباعة' : '✓ Pay & Print')}
         </button>
         {!!cart.length && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button onClick={holdSale} style={{ ...S.btnGhost, flex: 1, padding: '12px' }}>⏸ {ARABIC ? 'تعليق' : 'Hold'}</button>
-            <button onClick={() => { setCart([]); setTendered(''); }} style={{ ...S.btnGhost, flex: 1, padding: '12px', color: C.red }}>✕ {ARABIC ? 'إلغاء' : 'Clear'}</button>
+          <div style={{ display: 'flex', gap: T.space.sm, marginTop: T.space.sm }}>
+            <button onClick={holdSale} style={{ ...S.btnGhost, flex: 1, padding: `${T.space.md}px` }}>⏸ {ARABIC ? 'تعليق' : 'Hold'}</button>
+            <button onClick={() => { setCart([]); setTendered(''); }} style={{ ...S.btnGhost, flex: 1, padding: `${T.space.md}px`, color: C.red }}>✕ {ARABIC ? 'إلغاء' : 'Clear'}</button>
           </div>
         )}
       </div>
@@ -679,16 +679,16 @@ function SalesView({ user, notify }) {
 
       {showHeld && (
         <Overlay onClose={() => setShowHeld(false)}>
-          <div style={{ ...S.card, width: 360, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontWeight: 800, fontSize: 18 }}>⏸ {ARABIC ? 'الفواتير المعلّقة' : 'Held sales'}</div>
+          <div style={{ ...S.card, width: 360, display: 'flex', flexDirection: 'column', gap: T.space.sm, boxShadow: T.shadow.lg }}>
+            <div style={{ fontWeight: 700, fontSize: T.font.lg }}>⏸ {ARABIC ? 'الفواتير المعلّقة' : 'Held sales'}</div>
             {!held.length && <div style={{ color: C.dim }}>{ARABIC ? 'لا شيء' : 'None'}</div>}
             {held.map((h) => (
-              <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${C.line}` }}>
+              <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: T.space.sm, padding: `${T.space.sm}px 0`, borderBottom: `1px solid ${C.line}` }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700 }}>{money(h.total)} <span style={{ color: C.dim, fontSize: 12 }}>· {h.items.length} {ARABIC ? 'صنف' : 'items'} · {h.ts}</span></div>
+                  <div style={{ fontWeight: 700, ...T.num }}>{money(h.total)} <span style={{ color: C.dim, fontSize: T.font.xs, fontWeight: 500 }}>· {h.items.length} {ARABIC ? 'صنف' : 'items'} · {h.ts}</span></div>
                 </div>
-                <button onClick={() => resumeSale(h)} style={{ ...S.btn, padding: '8px 14px' }}>{ARABIC ? 'استئناف' : 'Resume'}</button>
-                <button onClick={() => persistHeld(held.filter((x) => x.id !== h.id))} style={{ ...S.btnGhost, padding: '8px 10px', color: C.red }}>×</button>
+                <button onClick={() => resumeSale(h)} style={{ ...S.btn, padding: `${T.space.sm}px ${T.space.lg}px` }}>{ARABIC ? 'استئناف' : 'Resume'}</button>
+                <button onClick={() => persistHeld(held.filter((x) => x.id !== h.id))} style={{ ...S.btnGhost, padding: `${T.space.sm}px ${T.space.md}px`, color: C.red }}>×</button>
               </div>
             ))}
           </div>
@@ -722,32 +722,32 @@ function WeightModal({ product, onClose, onAdd, notify }) {
   const submit = () => { if (!(w > 0)) { notify(ARABIC ? 'أدخل الوزن' : 'Enter weight', 'red'); return; } onAdd(w); };
   return (
     <Overlay onClose={onClose}>
-      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>⚖ {product.name}</div>
-        <div style={{ color: C.dim, fontSize: 13 }}>{money(product.price)}{ARABIC ? ' / كغ' : ' / kg'}</div>
-        <div style={{ ...S.input, fontSize: 22, fontWeight: 800, textAlign: 'center' }}>{kg || '0'} {ARABIC ? 'كغ' : 'kg'}</div>
-        <div style={{ textAlign: 'center', color: C.accent, fontWeight: 800, fontSize: 20 }}>= {money(w * (Number(product.price) || 0))}</div>
+      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: T.space.md, boxShadow: T.shadow.lg }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg }}>⚖ {product.name}</div>
+        <div style={{ color: C.dim, fontSize: T.font.sm, ...T.num }}>{money(product.price)}{ARABIC ? ' / كغ' : ' / kg'}</div>
+        <div style={{ ...S.input, background: C.panel2, fontSize: T.font.display, fontWeight: 700, textAlign: 'center', ...T.num }}>{kg || '0'} {ARABIC ? 'كغ' : 'kg'}</div>
+        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: T.font.xl, ...T.num }}>= {money(w * (Number(product.price) || 0))}</div>
         <NumPad onKey={onKey} onClear={() => setKg('')} onBackspace={() => setKg((v) => v.slice(0, -1))} />
-        <button onClick={submit} style={{ ...S.btn, padding: '14px', fontSize: 16 }}>{ARABIC ? 'إضافة للفاتورة' : 'Add to bill'}</button>
+        <button onClick={submit} style={{ ...S.btn, padding: `${T.space.md}px`, fontSize: T.font.lg }}>{ARABIC ? 'إضافة للفاتورة' : 'Add to bill'}</button>
       </div>
     </Overlay>
   );
 }
-const qtyBtn = { width: 42, height: 42, borderRadius: 9, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 22, lineHeight: '1', cursor: 'pointer', fontWeight: 700 };
+const qtyBtn = { width: 42, height: 42, borderRadius: T.radius.md, border: `1px solid ${C.line}`, background: C.panel, color: C.text, fontSize: T.font.xl, lineHeight: '1', cursor: 'pointer', fontWeight: 600 };
 
 // ── Numeric keypad (touch) — drives a numeric string field ──────────────────────
 function NumPad({ onKey, onClear, onBackspace }) {
   const k = (label, fn, extra = {}) => (
     <button key={label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={fn}
-      style={{ height: 56, borderRadius: 10, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: 22, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', ...extra }}>{label}</button>
+      style={{ height: 56, borderRadius: T.radius.md, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, fontSize: T.font.xl, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...T.num, ...extra }}>{label}</button>
   );
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: T.space.sm }}>
       {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => k(d, () => onKey(d)))}
       {k('.', () => onKey('.'))}
       {k('0', () => onKey('0'))}
-      {k('⌫', onBackspace, { background: C.red, color: '#fff' })}
-      {k('C', onClear, { gridColumn: '1 / -1', background: C.line })}
+      {k('⌫', onBackspace, { background: C.red, color: C.onColor })}
+      {k('C', onClear, { gridColumn: '1 / -1', background: C.line, color: C.dim })}
     </div>
   );
 }
@@ -760,22 +760,22 @@ function LineEditModal({ line, onClose, onApply, onRemove }) {
   const set = field === 'qty' ? setQty : setPrice;
   const onKey = (ch) => set((v) => (ch === '.' && v.includes('.') ? v : (v === '0' && ch !== '.' ? ch : v + ch)));
   const tab = (name, label, val) => (
-    <button type="button" onClick={() => setField(name)} style={{ flex: 1, padding: '12px', borderRadius: 8, border: `1px solid ${field === name ? C.accent : C.line}`, background: field === name ? C.accent : C.panel2, color: field === name ? C.accentText : C.text, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-      <div style={{ fontSize: 12 }}>{label}</div><div style={{ fontSize: 18 }}>{val || '0'}</div>
+    <button type="button" onClick={() => setField(name)} style={{ flex: 1, padding: `${T.space.md}px`, borderRadius: T.radius.md, border: `1px solid ${field === name ? C.accent : C.line}`, background: field === name ? C.accent : C.panel2, color: field === name ? C.accentText : C.text, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+      <div style={{ fontSize: T.font.xs }}>{label}</div><div style={{ fontSize: T.font.lg, fontWeight: 700, ...T.num }}>{val || '0'}</div>
     </button>
   );
   return (
     <Overlay onClose={onClose}>
-      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>{line.name}</div>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: T.space.md, boxShadow: T.shadow.lg }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg }}>{line.name}</div>
+        <div style={{ display: 'flex', gap: T.space.sm }}>
           {tab('qty', ARABIC ? 'الكمية' : 'Qty', qty)}
           {tab('price', ARABIC ? 'السعر' : 'Price', price)}
         </div>
         <NumPad onKey={onKey} onClear={() => set('')} onBackspace={() => set((v) => v.slice(0, -1))} />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => onApply(Number(qty) || 0, Number(price) || 0)} style={{ ...S.btn, flex: 1, padding: '14px', fontSize: 16 }}>{ARABIC ? 'حفظ' : 'Save'}</button>
-          <button onClick={onRemove} style={{ ...S.btnGhost, padding: '14px', color: C.red }}>{ARABIC ? 'حذف' : 'Remove'}</button>
+        <div style={{ display: 'flex', gap: T.space.sm }}>
+          <button onClick={() => onApply(Number(qty) || 0, Number(price) || 0)} style={{ ...S.btn, flex: 1, padding: `${T.space.md}px`, fontSize: T.font.lg }}>{ARABIC ? 'حفظ' : 'Save'}</button>
+          <button onClick={onRemove} style={{ ...S.btnGhost, padding: `${T.space.md}px`, color: C.red }}>{ARABIC ? 'حذف' : 'Remove'}</button>
         </div>
       </div>
     </Overlay>
@@ -794,12 +794,12 @@ function QuickItemModal({ onClose, onAdd, notify }) {
   };
   return (
     <Overlay onClose={onClose}>
-      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>{ARABIC ? 'صنف يدوي' : 'Quick item'}</div>
+      <div style={{ ...S.card, width: 320, display: 'flex', flexDirection: 'column', gap: T.space.md, boxShadow: T.shadow.lg }}>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg }}>{ARABIC ? 'صنف يدوي' : 'Quick item'}</div>
         <input style={S.input} value={name} onChange={(e) => setName(e.target.value)} placeholder={ARABIC ? 'الاسم' : 'Name'} autoFocus />
-        <div style={{ ...S.input, fontSize: 20, fontWeight: 800, textAlign: 'center', color: C.accent }}>{price || '0'}</div>
+        <div style={{ ...S.input, background: C.panel2, fontSize: T.font.xl, fontWeight: 700, textAlign: 'center', ...T.num }}>{price || '0'}</div>
         <NumPad onKey={onKey} onClear={() => setPrice('')} onBackspace={() => setPrice((v) => v.slice(0, -1))} />
-        <button onClick={submit} style={{ ...S.btn, padding: '14px', fontSize: 16 }}>{ARABIC ? 'إضافة للفاتورة' : 'Add to bill'}</button>
+        <button onClick={submit} style={{ ...S.btn, padding: `${T.space.md}px`, fontSize: T.font.lg }}>{ARABIC ? 'إضافة للفاتورة' : 'Add to bill'}</button>
       </div>
     </Overlay>
   );
