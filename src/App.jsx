@@ -260,7 +260,7 @@ function ClockButton() {
     } catch (_) {} finally { setBusy(false); }
   };
   return (
-    <button onClick={toggle} disabled={busy} style={{ ...S.btnGhost, height: 64, fontSize: 14, ...(open ? { borderColor: C.green, color: C.green } : {}) }}>
+    <button onClick={toggle} disabled={busy} style={{ ...S.btnGhost, height: 48, fontSize: T.font.base, ...(open ? { borderColor: C.green, color: C.green, fontWeight: 700 } : {}) }}>
       {open ? (ARABIC ? '🟢 خروج' : '🟢 Clock Out') : (ARABIC ? '🕐 دخول' : '🕐 Clock In')}
     </button>
   );
@@ -278,15 +278,15 @@ function NotificationsBell() {
   const count = low.length + exp.length;
   return (
     <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen((o) => !o)} style={{ ...S.btnGhost, height: 64, fontSize: 20, position: 'relative' }}>
-        🔔{count > 0 && <span style={{ position: 'absolute', top: 6, insetInlineEnd: 6, background: C.red, color: '#fff', borderRadius: 10, fontSize: 11, fontWeight: 800, padding: '1px 6px' }}>{count}</span>}
+      <button onClick={() => setOpen((o) => !o)} style={{ ...S.btnGhost, height: 48, fontSize: T.font.xl, position: 'relative' }}>
+        🔔{count > 0 && <span style={{ position: 'absolute', top: 6, insetInlineEnd: 6, background: C.red, color: C.onColor, borderRadius: T.radius.pill, fontSize: T.font.xs, fontWeight: 700, padding: '1px 6px', ...T.num }}>{count}</span>}
       </button>
       {open && (
-        <div style={{ position: 'absolute', insetInlineEnd: 0, top: 70, width: 300, maxHeight: 360, overflow: 'auto', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, zIndex: 1000, boxShadow: '0 8px 30px rgba(0,0,0,.5)' }}>
-          <div style={{ fontWeight: 800, marginBottom: 6, color: C.red }}>{ARABIC ? 'مخزون منخفض' : 'Low stock'} ({low.length})</div>
-          {low.slice(0, 8).map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}><span>{p.name}</span><span style={{ color: C.red }}>{Number(p.stock)}</span></div>)}
-          <div style={{ fontWeight: 800, margin: '10px 0 6px', color: C.accent }}>{ARABIC ? 'قرب الانتهاء' : 'Expiring'} ({exp.length})</div>
-          {exp.slice(0, 8).map((e) => <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}><span>{e.product}</span><span style={{ color: Number(e.days_left) < 0 ? C.red : C.accent }}>{e.expiry}</span></div>)}
+        <div style={{ position: 'absolute', insetInlineStart: 0, bottom: 54, width: 300, maxHeight: 360, overflow: 'auto', background: C.panel, border: `1px solid ${C.line}`, borderRadius: T.radius.lg, padding: T.space.md, zIndex: 1000, boxShadow: T.shadow.lg }}>
+          <div style={{ fontWeight: 700, fontSize: T.font.sm, marginBottom: T.space.xs, color: C.red }}>{ARABIC ? 'مخزون منخفض' : 'Low stock'} ({low.length})</div>
+          {low.slice(0, 8).map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: T.font.sm, padding: `${T.space.xs}px 0` }}><span>{p.name}</span><span style={{ color: C.red, fontWeight: 600, ...T.num }}>{Number(p.stock)}</span></div>)}
+          <div style={{ fontWeight: 700, fontSize: T.font.sm, margin: `${T.space.md}px 0 ${T.space.xs}px`, color: C.accent }}>{ARABIC ? 'قرب الانتهاء' : 'Expiring'} ({exp.length})</div>
+          {exp.slice(0, 8).map((e) => <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: T.font.sm, padding: `${T.space.xs}px 0` }}><span>{e.product}</span><span style={{ color: Number(e.days_left) < 0 ? C.red : C.accent, fontWeight: 600, ...T.num }}>{e.expiry}</span></div>)}
           {!count && <div style={{ color: C.dim, fontSize: T.font.sm }}>{ARABIC ? 'لا تنبيهات' : 'All good'}</div>}
         </div>
       )}
@@ -1284,7 +1284,7 @@ function Stat({ label, value, accent }) {
 // ══════════════════════════════════════════════════════════════════════════════
 function SettingsView({ user, isAdmin, notify }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: T.space.lg, maxWidth: 640 }}>
       <ChangePassword notify={notify} />
       {isAdmin && <Categories notify={notify} />}
       {isAdmin && <Users me={user} notify={notify} />}
@@ -1303,8 +1303,8 @@ function ChangePassword({ notify }) {
     finally { setBusy(false); }
   };
   return (
-    <form onSubmit={submit} style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontWeight: 800 }}>{ARABIC ? 'تغيير كلمة المرور' : 'Change password'}</div>
+    <form onSubmit={submit} style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: T.space.md }}>
+      <div style={{ fontWeight: 700, fontSize: T.font.lg }}>{ARABIC ? 'تغيير كلمة المرور' : 'Change password'}</div>
       <input style={S.input} type="password" value={oldPw} onChange={(e) => setOld(e.target.value)} placeholder={ARABIC ? 'كلمة المرور الحالية' : 'Current password'} />
       <input style={S.input} type="password" value={newPw} onChange={(e) => setNew(e.target.value)} placeholder={ARABIC ? 'كلمة مرور جديدة (8+)' : 'New password (8+)'} />
       <button type="submit" disabled={busy} style={{ ...S.btn, alignSelf: 'start', opacity: busy ? 0.6 : 1 }}>{ARABIC ? 'حفظ' : 'Save'}</button>
@@ -1321,8 +1321,8 @@ function Categories({ notify }) {
     catch (_) { notify(ARABIC ? 'فشل' : 'Failed', 'red'); }
   };
   return (
-    <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontWeight: 800 }}>{ARABIC ? 'الفئات' : 'Categories'}</div>
+    <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: T.space.md }}>
+      <div style={{ fontWeight: 700, fontSize: T.font.lg }}>{ARABIC ? 'الفئات' : 'Categories'}</div>
       <input style={S.input} value={text} onChange={(e) => setText(e.target.value)} placeholder="Drinks, Snacks, Dairy…" />
       <button onClick={save} style={{ ...S.btn, alignSelf: 'start' }}>{ARABIC ? 'حفظ' : 'Save'}</button>
     </div>
@@ -1352,26 +1352,26 @@ function Users({ me, notify }) {
   const toggleView = (v) => setForm((f) => ({ ...f, views: f.views.includes(v) ? f.views.filter((x) => x !== v) : [...f.views, v] }));
 
   return (
-    <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: T.space.md }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 800 }}>{ARABIC ? 'الموظفون' : 'Employees'}</div>
+        <div style={{ fontWeight: 700, fontSize: T.font.lg }}>{ARABIC ? 'الموظفون' : 'Employees'}</div>
         <button onClick={() => setAdding((a) => !a)} style={S.btnGhost}>{adding ? (ARABIC ? 'إغلاق' : 'Close') : (ARABIC ? '+ موظف' : '+ Employee')}</button>
       </div>
       {adding && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, background: C.panel2, borderRadius: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: T.space.sm, padding: T.space.md, background: C.panel2, borderRadius: T.radius.md }}>
           <input style={S.input} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder={ARABIC ? 'الاسم الكامل' : 'Full name'} />
           <input style={S.input} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder={ARABIC ? 'اسم المستخدم' : 'Username'} autoCapitalize="off" />
           <input style={S.input} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={ARABIC ? 'كلمة المرور (8+)' : 'Password (8+)'} />
           <input style={S.input} type="number" step="0.01" value={form.wage} onChange={(e) => setForm({ ...form, wage: e.target.value })} placeholder={ARABIC ? 'أجر الساعة (اختياري)' : 'Hourly wage (optional)'} />
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: T.space.sm }}>
             {['user', 'admin'].map((r) => (
-              <button key={r} onClick={() => setForm({ ...form, role: r })} style={{ ...S.btnGhost, flex: 1, ...(form.role === r ? { background: C.accent, color: '#fff', borderColor: C.accent } : {}) }}>{r}</button>
+              <button key={r} onClick={() => setForm({ ...form, role: r })} style={{ ...S.btnGhost, flex: 1, ...(form.role === r ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>{r}</button>
             ))}
           </div>
           {form.role === 'user' && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: T.space.sm, flexWrap: 'wrap' }}>
               {VIEW_OPTS.map((v) => (
-                <button key={v} onClick={() => toggleView(v)} style={{ ...S.btnGhost, padding: '6px 10px', ...(form.views.includes(v) ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>{VIEW_LABELS[v]}</button>
+                <button key={v} onClick={() => toggleView(v)} style={{ ...S.btnGhost, padding: `${T.space.xs}px ${T.space.md}px`, ...(form.views.includes(v) ? { background: C.accent, color: C.accentText, borderColor: C.accent } : {}) }}>{VIEW_LABELS[v]}</button>
               ))}
             </div>
           )}
@@ -1380,12 +1380,12 @@ function Users({ me, notify }) {
       )}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {users.map((u) => (
-          <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
+          <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: T.space.sm, padding: `${T.space.sm}px 0`, borderTop: `1px solid ${C.line}` }}>
             <div style={{ flex: 1 }}>
               <span style={{ fontWeight: 600 }}>{u.full_name || u.username}</span>
-              <span style={{ color: C.dim, fontSize: 12, marginInlineStart: 8 }}>{u.username} · {u.role}{u.role !== 'admin' && (u.allowed_views || []).length ? ' · ' + u.allowed_views.join(', ') : ''}{Number(u.wage) > 0 ? ' · ' + money(u.wage) + '/h' : ''}</span>
+              <span style={{ color: C.dim, fontSize: T.font.xs, marginInlineStart: T.space.sm }}>{u.username} · {u.role}{u.role !== 'admin' && (u.allowed_views || []).length ? ' · ' + u.allowed_views.join(', ') : ''}{Number(u.wage) > 0 ? ' · ' + money(u.wage) + '/h' : ''}</span>
             </div>
-            {u.id !== me.id && <button onClick={() => del(u)} style={{ ...S.btnGhost, padding: '5px 10px', color: C.red }}>{ARABIC ? 'حذف' : 'Del'}</button>}
+            {u.id !== me.id && <button onClick={() => del(u)} style={{ ...S.btnGhost, padding: `${T.space.xs}px ${T.space.md}px`, color: C.red }}>{ARABIC ? 'حذف' : 'Del'}</button>}
           </div>
         ))}
       </div>
